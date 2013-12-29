@@ -10,7 +10,7 @@ Tests for `aimless` module.
 
 import unittest
 
-from aimless import aimless
+from aimless import main
 
 
 class TestAimless(unittest.TestCase):
