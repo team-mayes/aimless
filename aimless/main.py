@@ -11,10 +11,12 @@ import os
 import sys
 import optparse
 from aimless.aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
-                             COORDS_KEY, TPL_DIR_KEY, MAIN_SEC, calc_params, EnvError, TGT_DIR_KEY, write_tpl_files)
+                             COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files)
 
 
 DEF_CFG_NAME = 'aimless.ini'
+TPL_DIR_KEY = 'tpldir'
+TGT_DIR_KEY = 'tgtdir'
 
 # Log Setup #
 # logdir = os.environ.get("LOGDIR")
@@ -44,10 +46,9 @@ CFG_DEFAULTS = {
 # Logic #
 
 def fetch_calc_params(config):
-    params = dict()
-    params[TOTAL_STEPS_KEY] = config.getint(MAIN_SEC, TOTAL_STEPS_KEY)
+    params = calc_params(config.getint(MAIN_SEC, TOTAL_STEPS_KEY))
     params[NUM_PATHS_KEY] = config.getint(MAIN_SEC, NUM_PATHS_KEY)
-    return calc_params(params)
+    return params
 
 def write_tpls(config, params):
     tpl_dir = config.get(MAIN_SEC, TPL_DIR_KEY)

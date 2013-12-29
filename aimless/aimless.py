@@ -11,24 +11,32 @@ FW_OUT_KEY = 'fwout'
 DT_OUT_KEY = 'dtout'
 TOPO_KEY = 'topology'
 COORDS_KEY = 'coordinates'
-TPL_DIR_KEY = 'tpldir'
-TGT_DIR_KEY = 'tgtdir'
 MAIN_SEC = 'main'
 
-class TemplateError(Exception): pass
-class EnvError(Exception): pass
 
-def calc_params(raw):
-    results = raw.copy()
-    results[BW_STEPS_KEY] = results[TOTAL_STEPS_KEY] / 2
-    results[FW_STEPS_KEY] = results[TOTAL_STEPS_KEY] / 2
-    results[DT_STEPS_KEY] = results[TOTAL_STEPS_KEY] / 100
+class TemplateError(Exception):
+    pass
+
+
+class EnvError(Exception):
+    pass
+
+
+def calc_params(total_steps):
+    """
+    Returns a dict with calculated values based on the given number of total
+    steps.
+    """
+    results = {TOTAL_STEPS_KEY: total_steps}
+    results[BW_STEPS_KEY] = total_steps / 2
+    results[FW_STEPS_KEY] = total_steps / 2
+    results[DT_STEPS_KEY] = total_steps / 100
     results[BW_OUT_KEY] = results[BW_STEPS_KEY] - 1
     results[FW_OUT_KEY] = results[FW_STEPS_KEY] - 1
     results[DT_OUT_KEY] = results[DT_STEPS_KEY] - 1
     return results
 
-tpl_idx = [
+TPL_LIST = [
     ("cons.tpl", "cons.rst",
      "force constants are zero - this is just to get final bond lengths"),
     ("instarter.tpl", "instarter.in",
@@ -38,8 +46,9 @@ tpl_idx = [
     ("inbackward.tpl", "inbackward.in", "backward portion of the trajectory"),
 ]
 
+
 def write_tpl_files(tpl_dir, tgt_dir, params):
-    for tpl_name, tgt_name, tpl_desc in tpl_idx:
+    for tpl_name, tgt_name, tpl_desc in TPL_LIST:
         tpl_loc = os.path.join(tpl_dir, tpl_name)
         try:
             with open(tpl_loc, 'r') as tpl_file:
