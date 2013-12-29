@@ -10,9 +10,8 @@ import logging
 import os
 import sys
 import optparse
-from aimless.aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
+from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
                              COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files)
-
 
 DEF_CFG_NAME = 'aimless.ini'
 TPL_DIR_KEY = 'tpldir'
@@ -40,7 +39,7 @@ CFG_DEFAULTS = {
     TOPO_KEY: 'input/cel6a_solv.prmtop',
     COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
     TPL_DIR_KEY: os.path.join(os.path.dirname(__file__), 'tpl'),
-    TGT_DIR_KEY: os.path.getcwd(),
+    TGT_DIR_KEY: os.getcwd(),
 }
 
 # Logic #
