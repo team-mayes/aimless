@@ -11,7 +11,8 @@ import os
 import sys
 import optparse
 from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
-                             COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files)
+                             COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files, init_dir, JOBS_SEC)
+from aimless import NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY, AimlessShooter
 
 DEF_CFG_NAME = 'aimless.ini'
 TPL_DIR_KEY = 'tpldir'
@@ -40,7 +41,13 @@ CFG_DEFAULTS = {
     COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
     TPL_DIR_KEY: os.path.join(os.path.dirname(__file__), 'tpl'),
     TGT_DIR_KEY: os.getcwd(),
+    NUMNODES_KEY: 1,
+    NUMCPUS_KEY: 8,
+    WALLTIME_KEY: '999:00:00',
+    MAIL_KEY: 'hmayes@hmayes.com',
 }
+
+JOBS_KEYS = [NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY]
 
 # Logic #
 
@@ -58,6 +65,19 @@ def write_tpls(config, params):
         os.makedirs(tgt_dir)
     write_tpl_files(tpl_dir, tgt_dir, params)
 
+def run(config):
+    num_paths = config.getint(MAIN_SEC, NUM_PATHS_KEY)
+    tgt_dir = config.get(MAIN_SEC, TGT_DIR_KEY)
+    tpl_dir = config.get(MAIN_SEC, TPL_DIR_KEY)
+    coords_file = config.get(MAIN_SEC, COORDS_KEY)
+    init_dir(tgt_dir, coords_file)
+    jparams = dict()
+    for jkey in JOBS_KEYS:
+        jparams[jkey] = config.get(JOBS_SEC, jkey)
+    topo_file = config.get(MAIN_SEC, TOPO_KEY)
+    aims = AimlessShooter(tgt_dir, tpl_dir, topo_file, jparams)
+    aims.run_calcs(num_paths)
+
 # Command-line processing and control #
 
 def read_config(file_loc):
@@ -68,6 +88,8 @@ def read_config(file_loc):
 
     if not config.has_section(MAIN_SEC):
         config.add_section(MAIN_SEC)
+    if not config.has_section(JOBS_SEC):
+        config.add_section(JOBS_SEC)
 
     return config
 
@@ -108,6 +130,7 @@ def main(argv=None):
     config = read_config(opts.cfg_file)
     params = fetch_calc_params(config)
     write_tpls(config, params)
+    run(config)
     return 0        # success
 
 if __name__ == '__main__':

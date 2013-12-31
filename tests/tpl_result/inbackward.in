@@ -45,4 +45,4 @@ backward portion of the trajectory
         type='END',
   /
   DISANG=cons.rst
-  DUMPAVE=cons.dat
+  DUMPAVE=cons_back.dat
