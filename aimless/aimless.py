@@ -8,7 +8,7 @@ import time
 from torque import TorqueJob, TorqueSubmissionHandler
 
 # Constants #
-WAIT_SECS = 10
+DEF_WAIT_SECS = 10
 
 # Config Sections #
 MAIN_SEC = 'main'
@@ -32,6 +32,12 @@ FWD_OUT_NAME = "inforward.out"
 DT_OUT_NAME = "indt.out"
 STARTER_OUT_NAME = "instarter.out"
 
+# MDCRD files
+BACK_MDCRD_NAME = "inbackward.out"
+FWD_MDCRD_NAME = "inforward.out"
+DT_MDCRD_NAME = "indt.out"
+STARTER_MDCRD_NAME = "starter.mdcrd"
+
 # Config Keys #
 NUM_PATHS_KEY = 'numpaths'
 TOTAL_STEPS_KEY = 'totalsteps'
@@ -52,8 +58,9 @@ WALLTIME_KEY = 'walltime'
 MAIL_KEY = 'mail'
 INFILE_KEY = 'infile'
 OUTFILE_KEY = 'outfile'
+MDCRD_KEY = 'mdcrd'
 
-
+# Exceptions #
 class TemplateError(Exception):
     pass
 
@@ -61,6 +68,7 @@ class TemplateError(Exception):
 class EnvError(Exception):
     pass
 
+# Logic #
 
 def calc_params(total_steps):
     """
@@ -125,14 +133,16 @@ class AimlessShooter(object):
     Encapsulates the process of running and analyzing compute jobs related
     to the Aimless Shooting modeling technique.
     """
-    def __init__(self, tgt_dir, tpl_dir, topo_loc, job_params,
-                 sub_handler=TorqueSubmissionHandler(), out=sys.stdout):
+    def __init__(self, tpl_dir, tgt_dir, topo_loc, job_params,
+                 sub_handler=TorqueSubmissionHandler(), out=sys.stdout,
+                 wait_secs=DEF_WAIT_SECS):
         self.tgt_dir = tgt_dir
         self.tpl_dir = tpl_dir
         self.topo_loc = topo_loc
         self.job_params = job_params
         self.sub_handler = sub_handler
         self.out = out
+        self.wait_secs = wait_secs
 
     def run_calcs(self, num_paths):
         for pnum in range(1, num_paths + 1):
@@ -145,7 +155,9 @@ class AimlessShooter(object):
             self.out.write("running starter... generating velocities")
             start_id = self._sub_job(shooter, os.path.join(self.tgt_dir, FWD_IN_NAME),
                                      os.path.join(self.tgt_dir, STARTER_IN_NAME),
-                                     os.path.join(self.tgt_dir, STARTER_OUT_NAME))
+                                     os.path.join(self.tgt_dir, STARTER_OUT_NAME),
+                                     os.path.join(self.tgt_dir, STARTER_MDCRD_NAME),
+                                     )
             self._wait_on_jobs([start_id])
 
     def _wait_on_jobs(self, job_ids):
@@ -153,20 +165,21 @@ class AimlessShooter(object):
         wait_count = 1
         while any_key(job_ids, jstats):
             self.out.write("Waiting '%d' seconds for job IDs '%s'" %
-                           (wait_count * WAIT_SECS, ",".join(job_ids)))
-            time.sleep(WAIT_SECS)
+                           (wait_count * self.wait_secs, ",".join(map(str, job_ids))))
+            time.sleep(self.wait_secs)
             wait_count += 1
             jstats = self.sub_handler.stat_jobs(job_ids)
         self.out.write("Finished job IDs '%s' in '%d' seconds" %
-                       (",".join(job_ids), wait_count * WAIT_SECS))
+                       (",".join(map(str, job_ids)), wait_count * self.wait_secs))
 
-    def _sub_job(self, shooter_loc, dir_rst_loc, in_loc, out_loc):
+    def _sub_job(self, shooter_loc, dir_rst_loc, in_loc, out_loc, mdcrd_loc):
         local_params = self.job_params.copy()
         local_params[TOPO_KEY] = self.topo_loc
         local_params[SHOOTER_KEY] = shooter_loc
         local_params[DIR_RST_KEY] = dir_rst_loc
         local_params[INFILE_KEY] = in_loc
         local_params[OUTFILE_KEY] = out_loc
+        local_params[MDCRD_KEY] = mdcrd_loc
 
         tpl_loc = os.path.join(self.tpl_dir, AMBER_JOB_TPL)
         with open(tpl_loc, 'r') as tpl_file:

@@ -75,7 +75,7 @@ def run(config):
     for jkey in JOBS_KEYS:
         jparams[jkey] = config.get(JOBS_SEC, jkey)
     topo_file = config.get(MAIN_SEC, TOPO_KEY)
-    aims = AimlessShooter(tgt_dir, tpl_dir, topo_file, jparams)
+    aims = AimlessShooter(tpl_dir, tgt_dir, topo_file, jparams)
     aims.run_calcs(num_paths)
 
 # Command-line processing and control #

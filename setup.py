@@ -31,7 +31,7 @@ setup(
     package_dir={'aimless': 'aimless'},
     include_package_data=True,
     install_requires=[
-    ],
+    'mock',],
     license="BSD",
     zip_safe=False,
     keywords='aimless',
