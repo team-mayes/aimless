@@ -18,6 +18,8 @@ DEF_CFG_NAME = 'aimless.ini'
 TPL_DIR_KEY = 'tpldir'
 TGT_DIR_KEY = 'tgtdir'
 
+# TODO: Consider merging into aimless
+
 # Log Setup #
 # logdir = os.environ.get("LOGDIR")
 # if logdir:
@@ -34,15 +36,16 @@ TGT_DIR_KEY = 'tgtdir'
 logger = logging.getLogger("aimless")
 logger.debug("Testing the logger")
 
+# Note that ConfigParser expects all of these values to be strings
 CFG_DEFAULTS = {
-    NUM_PATHS_KEY: 20,
-    TOTAL_STEPS_KEY: 2500,
+    NUM_PATHS_KEY: '20',
+    TOTAL_STEPS_KEY: '2500',
     TOPO_KEY: 'input/cel6a_solv.prmtop',
     COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
-    TPL_DIR_KEY: os.path.join(os.path.dirname(__file__), 'tpl'),
+    TPL_DIR_KEY: os.path.join(os.path.dirname(__file__), 'skel/tpl'),
     TGT_DIR_KEY: os.getcwd(),
-    NUMNODES_KEY: 1,
-    NUMCPUS_KEY: 8,
+    NUMNODES_KEY: '1',
+    NUMCPUS_KEY: '8',
     WALLTIME_KEY: '999:00:00',
     MAIL_KEY: 'hmayes@hmayes.com',
 }

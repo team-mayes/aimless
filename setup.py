@@ -28,6 +28,12 @@ setup(
     packages=[
         'aimless',
     ],
+    entry_points = {
+        'console_scripts': [
+            'aimless = aimless.main:main',
+            'aimless_dest = aimless.int_loc:main',
+        ],
+    },
     package_dir={'aimless': 'aimless'},
     include_package_data=True,
     install_requires=[
