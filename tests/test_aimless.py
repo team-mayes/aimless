@@ -34,6 +34,8 @@ FWBW_OUT_VAL = FWBW_VAL - 1
 DT_OUT_VAL = DT_VAL - 1
 TPL_RESULT_DIR = os.path.join(os.path.dirname(__file__), 'tpl_result')
 INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
+TPL_DIR = os.path.join(os.path.dirname(__file__), os.pardir, 'aimless', 'skel',
+                       'tpl')
 TGT_DIR_VAL = "test/tgt/dir"
 SHOOTER_LOC_VAL = "test_shooter.rst"
 DIR_RST_LOC = "test_dir.rst"
@@ -72,7 +74,7 @@ class TestWriteTpls(unittest.TestCase):
         tgt_dir = CFG_DEFAULTS[TGT_DIR_KEY]
         self._del_tgts(tgt_dir)
         try:
-            write_tpl_files(CFG_DEFAULTS[TPL_DIR_KEY], tgt_dir, self.params)
+            write_tpl_files(TPL_DIR, tgt_dir, self.params)
             self._check_tgts(tgt_dir)
         finally:
             self._del_tgts(tgt_dir)
@@ -82,7 +84,7 @@ class TestWriteTpls(unittest.TestCase):
         tgt_dir = tempfile.mkdtemp()
         self._del_tgts(tgt_dir)
         try:
-            write_tpl_files(CFG_DEFAULTS[TPL_DIR_KEY], tgt_dir, self.params)
+            write_tpl_files(TPL_DIR, tgt_dir, self.params)
             self._check_tgts(tgt_dir)
         finally:
             self._del_tgts(tgt_dir)
@@ -121,7 +123,7 @@ class TestAimlessShooter(unittest.TestCase):
         self.tgt_dir = tempfile.mkdtemp()
         self.out = StringIO.StringIO()
         self.handler = MagicMock()
-        self.aimless = AimlessShooter(CFG_DEFAULTS[TPL_DIR_KEY], self.tgt_dir,
+        self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
                                       TOPO_LOC, dict(),
                                       sub_handler=self.handler,
                                       out=self.out, wait_secs=.001)
@@ -152,8 +154,8 @@ class TestAimlessShooter(unittest.TestCase):
         init_dir(self.tgt_dir, COORDS_LOC)
         self.handler.submit.side_effect = [TEST_ID, TEST_ID2, TEST_ID3]
         self.handler.stat_jobs.side_effect = [{TEST_ID: "something"}, {},
-            {TEST_ID2: "something"}, {TEST_ID2: "something"}, {},
-            {TEST_ID3: "something"}, {}]
+                                              {TEST_ID2: "something"}, {TEST_ID2: "something"}, {},
+                                              {TEST_ID3: "something"}, {}]
         self.aimless.run_calcs(3)
         self.assertEqual(7, self.handler.stat_jobs.call_count)
 

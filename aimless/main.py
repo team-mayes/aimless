@@ -42,7 +42,7 @@ CFG_DEFAULTS = {
     TOTAL_STEPS_KEY: '2500',
     TOPO_KEY: 'input/cel6a_solv.prmtop',
     COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
-    TPL_DIR_KEY: os.path.join(os.path.dirname(__file__), 'skel/tpl'),
+    TPL_DIR_KEY: 'tpl',
     TGT_DIR_KEY: os.getcwd(),
     NUMNODES_KEY: '1',
     NUMCPUS_KEY: '8',
