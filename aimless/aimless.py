@@ -150,9 +150,9 @@ class AimlessShooter(object):
                 shooter = os.path.join(self.tgt_dir, XONE_RST)
             else:
                 shooter = os.path.join(self.tgt_dir, XTWO_RST)
-            self.out.write("Using '%s'" % shooter)
+            self.out.write("Using '%s'\n" % shooter)
             shutil.copy2(shooter, os.path.join(self.tgt_dir, SHOOTER_RST))
-            self.out.write("running starter... generating velocities")
+            self.out.write('running starter... generating velocities\n')
             start_id = self._sub_job(shooter, os.path.join(self.tgt_dir, FWD_IN_NAME),
                                      os.path.join(self.tgt_dir, STARTER_IN_NAME),
                                      os.path.join(self.tgt_dir, STARTER_OUT_NAME),
@@ -164,12 +164,12 @@ class AimlessShooter(object):
         jstats = self.sub_handler.stat_jobs(job_ids)
         wait_count = 1
         while any_key(job_ids, jstats):
-            self.out.write("Waiting '%d' seconds for job IDs '%s'" %
+            self.out.write("Waiting '%d' seconds for job IDs '%s'\n" %
                            (wait_count * self.wait_secs, ",".join(map(str, job_ids))))
             time.sleep(self.wait_secs)
             wait_count += 1
             jstats = self.sub_handler.stat_jobs(job_ids)
-        self.out.write("Finished job IDs '%s' in '%d' seconds" %
+        self.out.write("Finished job IDs '%s' in '%d' seconds\n" %
                        (",".join(map(str, job_ids)), wait_count * self.wait_secs))
 
     def _sub_job(self, shooter_loc, dir_rst_loc, in_loc, out_loc, mdcrd_loc):
