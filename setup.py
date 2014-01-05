@@ -31,10 +31,13 @@ setup(
     entry_points = {
         'console_scripts': [
             'aimless = aimless.main:main',
-            'aimless_dest = aimless.int_loc:main',
+            'aimless_init = aimless.init_loc:main',
         ],
     },
     package_dir={'aimless': 'aimless'},
+    package_data = {
+        'aimless': ['skel/*.*', 'skel/tpl/*.*', 'skel/input/*.*'],
+    },
     include_package_data=True,
     install_requires=[
     'mock',],
