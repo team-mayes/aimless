@@ -103,7 +103,8 @@ class JobStatus(StructEq, AutoRepr):
     def from_xml(cls, xml_element):
         "Job status instance filled from the -x option on qstat"
         jattrs = {}
-        for item in xml_element.iter():
+        # Switched from iter() to getiterator() to support 2.6 env
+        for item in xml_element.getiterator():
             if item.tag == 'Job_Id':
                 jattrs['job_id'] = parse_id(item.text)
             elif item.tag == 'Walltime':
@@ -166,9 +167,10 @@ class TorqueSubmissionHandler(object):
         cmd += ["-e", job.stderr]
         cmd += ["-q", job.queue]
         cmd += ["-l", 'walltime=%s' % job.walltime]
-        cmd += ["-l", 'nodes=%s' % job.numnodes]
-        if job.numcpus:
-            cmd += ["-l", 'ppn=%s' % job.numcpus]
+        if job.numnodes and job.numcpus:
+            cmd += ["-l", 'nodes=%s:ppn=%s' % (job.numnodes, job.numcpus)]
+        elif job.numnodes:
+            cmd += ["-l", 'nodes=%s' % job.numnodes]
         if job.mail:
             cmd += ["-m", 'a']
             cmd += ["-M", job.mail]
@@ -180,6 +182,7 @@ class TorqueSubmissionHandler(object):
     
     def submit(self, job):
         "Submits the given job, returning the numeric job ID."
+        logger.debug("Running queue command '%s'" % self.create_submit_cmd(job))
         proc = self.run(self.create_submit_cmd(job))
         out, err = proc.communicate(job.contents)
         if len(out) == 0:

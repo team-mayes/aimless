@@ -11,7 +11,7 @@ import os
 import sys
 import optparse
 from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
-                             COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files, init_dir, JOBS_SEC)
+                     COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files, init_dir, JOBS_SEC)
 from aimless import NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY, AimlessShooter
 
 DEF_CFG_NAME = 'aimless.ini'
@@ -33,7 +33,8 @@ TGT_DIR_KEY = 'tgtdir'
 # logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 #                     filename=logfile)
 
-logger = logging.getLogger("aimless")
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger("aimless_main")
 logger.debug("Testing the logger")
 
 # Note that ConfigParser expects all of these values to be strings
@@ -59,6 +60,7 @@ def fetch_calc_params(config):
     params[NUM_PATHS_KEY] = config.getint(MAIN_SEC, NUM_PATHS_KEY)
     return params
 
+
 def write_tpls(config, params):
     tpl_dir = config.get(MAIN_SEC, TPL_DIR_KEY)
     if not os.path.exists(tpl_dir):
@@ -67,6 +69,7 @@ def write_tpls(config, params):
     if not os.path.exists(tgt_dir):
         os.makedirs(tgt_dir)
     write_tpl_files(tpl_dir, tgt_dir, params)
+
 
 def run(config):
     num_paths = config.getint(MAIN_SEC, NUM_PATHS_KEY)
@@ -95,6 +98,7 @@ def read_config(file_loc):
         config.add_section(JOBS_SEC)
 
     return config
+
 
 def parse_cmdline(argv):
     """
@@ -135,6 +139,7 @@ def main(argv=None):
     write_tpls(config, params)
     run(config)
     return 0        # success
+
 
 if __name__ == '__main__':
     status = main()

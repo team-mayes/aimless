@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from shlex import shlex
@@ -5,20 +6,26 @@ import shutil
 from string import Template
 import sys
 import time
+import datetime
+from common import STATES
 from torque import TorqueJob, TorqueSubmissionHandler
 
 # Constants #
 DEF_WAIT_SECS = 10
+TSTAMP_FMT = '%Y-%m-%d %H:%M:%S'
 
 # Config Sections #
 MAIN_SEC = 'main'
 JOBS_SEC = 'jobs'
 
-# Shooter Files #
+# Shooter Resources #
 XONE_RST = "x1.rst"
 XTWO_RST = "x2.rst"
 SHOOTER_RST = "shooter.rst"
+FWD_RST_NAME = "forward.rst"
+BACK_RST_NAME = "backward.rst"
 AMBER_JOB_TPL = 'amber_job.tpl'
+OUT_DIR = 'output'
 
 # Directional Input Files #
 BACK_IN_NAME = "inbackward.in"
@@ -60,6 +67,8 @@ INFILE_KEY = 'infile'
 OUTFILE_KEY = 'outfile'
 MDCRD_KEY = 'mdcrd'
 
+logger = logging.getLogger("aimless")
+
 # Exceptions #
 class TemplateError(Exception):
     pass
@@ -95,7 +104,7 @@ TPL_LIST = [
     ("inbackward.tpl", BACK_IN_NAME, "backward portion of the trajectory"),
 ]
 
-
+# TODO: Move write_tpl_files and init_dir to AimlessShooter
 def write_tpl_files(tpl_dir, tgt_dir, params):
     for tpl_name, tgt_name, tpl_desc in TPL_LIST:
         tpl_loc = os.path.join(tpl_dir, tpl_name)
@@ -121,18 +130,24 @@ def init_dir(tgt_dir, coords_loc):
     shutil.copy2(coords_loc, os.path.join(tgt_dir, XTWO_RST))
 
 
-def any_key(keys, tgt):
+def is_running(keys, tgt):
+    """Returns whether any jobs are running.
+    """
     for tkey in keys:
         if tkey in tgt:
-            return True
+            stat = tgt[tkey]
+            if stat.job_state != STATES.COMPLETED:
+                return True
+            else:
+                logger.info("Job %s complete" % tkey)
     return False
-
 
 class AimlessShooter(object):
     """
     Encapsulates the process of running and analyzing compute jobs related
     to the Aimless Shooting modeling technique.
     """
+
     def __init__(self, tpl_dir, tgt_dir, topo_loc, job_params,
                  sub_handler=TorqueSubmissionHandler(), out=sys.stdout,
                  wait_secs=DEF_WAIT_SECS):
@@ -144,6 +159,26 @@ class AimlessShooter(object):
         self.out = out
         self.wait_secs = wait_secs
 
+    def run_dt(self):
+        self.out.write('running dt\n')
+        start_id = self._sub_job(os.path.join(self.tgt_dir, FWD_RST_NAME),
+                                 os.path.join(self.tgt_dir, FWD_IN_NAME),
+                                 os.path.join(self.tgt_dir, STARTER_IN_NAME),
+                                 os.path.join(self.tgt_dir, STARTER_OUT_NAME),
+                                 os.path.join(self.tgt_dir, STARTER_MDCRD_NAME),
+        )
+        self._wait_on_jobs([start_id])
+
+    def run_starter(self, pnum, shooter):
+        self.out.write('running starter... generating velocities\n')
+        start_id = self._sub_job(shooter, os.path.join(self.tgt_dir, FWD_IN_NAME),
+                                 os.path.join(self.tgt_dir, STARTER_IN_NAME),
+                                 os.path.join(self.tgt_dir, STARTER_OUT_NAME),
+                                 os.path.join(self.tgt_dir, STARTER_MDCRD_NAME),
+        )
+        self._wait_on_jobs([start_id])
+        self.path_backup(FWD_RST_NAME, pnum)
+
     def run_calcs(self, num_paths):
         for pnum in range(1, num_paths + 1):
             if random.randint(0, 1):
@@ -152,25 +187,43 @@ class AimlessShooter(object):
                 shooter = os.path.join(self.tgt_dir, XTWO_RST)
             self.out.write("Using '%s'\n" % shooter)
             shutil.copy2(shooter, os.path.join(self.tgt_dir, SHOOTER_RST))
-            self.out.write('running starter... generating velocities\n')
-            start_id = self._sub_job(shooter, os.path.join(self.tgt_dir, FWD_IN_NAME),
-                                     os.path.join(self.tgt_dir, STARTER_IN_NAME),
-                                     os.path.join(self.tgt_dir, STARTER_OUT_NAME),
-                                     os.path.join(self.tgt_dir, STARTER_MDCRD_NAME),
-                                     )
-            self._wait_on_jobs([start_id])
+            self.run_starter(pnum, shooter)
+            self.rev_vel()
+
+    def path_backup(self, src_file, pnum):
+        """
+        Creates a backup of 'src_file' in the output directory for 'pnum'.
+        """
+        path_out_dir = os.path.join(self.tgt_dir, OUT_DIR, str(pnum))
+        if not os.path.exists(path_out_dir):
+            os.makedirs(path_out_dir)
+
+        shutil.copy2(os.path.join(self.tgt_dir, src_file), path_out_dir)
+
+    def rev_vel(self):
+        self.out.write('running dt\n')
+        fwd_loc = os.path.join(self.tgt_dir, FWD_RST_NAME)
+        back_loc = os.path.join(self.tgt_dir, BACK_RST_NAME)
+        with open(fwd_loc) as fwd_file:
+            fwd_lines = [line.rstrip('\n') for line in fwd_file]
+        with open(back_loc, 'w') as back_file:
+            back_file.write(fwd_lines[0])
+            back_file.write("Made by '%s' at %s\n" % (os.path.basename(__file__),
+                                                      datetime.datetime.now().
+                                                      strftime(TSTAMP_FMT)))
+            # TODO: Port the rest of revvels.x
 
     def _wait_on_jobs(self, job_ids):
         jstats = self.sub_handler.stat_jobs(job_ids)
         wait_count = 1
-        while any_key(job_ids, jstats):
+        while is_running(job_ids, jstats):
             self.out.write("Waiting '%d' seconds for job IDs '%s'\n" %
                            (wait_count * self.wait_secs, ",".join(map(str, job_ids))))
             time.sleep(self.wait_secs)
             wait_count += 1
             jstats = self.sub_handler.stat_jobs(job_ids)
         self.out.write("Finished job IDs '%s' in '%d' seconds\n" %
-                       (",".join(map(str, job_ids)), wait_count * self.wait_secs))
+                       (",".join(map(str, job_ids)), (wait_count - 1) * self.wait_secs))
 
     def _sub_job(self, shooter_loc, dir_rst_loc, in_loc, out_loc, mdcrd_loc):
         local_params = self.job_params.copy()
@@ -186,5 +239,6 @@ class AimlessShooter(object):
             tpl = Template(tpl_file.read())
             result = tpl.safe_substitute(local_params)
         job = TorqueJob(**local_params)
+        logger.info("Submitting:\n%s" % result)
         job.contents = result
         return self.sub_handler.submit(job)

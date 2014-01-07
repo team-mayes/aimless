@@ -20,8 +20,9 @@ import unittest
 
 from aimless.aimless import (calc_params, TOTAL_STEPS_KEY, BW_STEPS_KEY,
                              FW_STEPS_KEY, DT_STEPS_KEY, BW_OUT_KEY,
-                             FW_OUT_KEY, DT_OUT_KEY, write_tpl_files, TPL_LIST, AimlessShooter, init_dir)
-from aimless.main import (CFG_DEFAULTS, TPL_DIR_KEY, TGT_DIR_KEY)
+                             FW_OUT_KEY, DT_OUT_KEY, write_tpl_files,
+                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME)
+from aimless.main import (CFG_DEFAULTS, TGT_DIR_KEY)
 
 # Test Constants #
 TEST_ID = 11
@@ -33,6 +34,7 @@ DT_VAL = TS_VAL / 100
 FWBW_OUT_VAL = FWBW_VAL - 1
 DT_OUT_VAL = DT_VAL - 1
 TPL_RESULT_DIR = os.path.join(os.path.dirname(__file__), 'tpl_result')
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
 TPL_DIR = os.path.join(os.path.dirname(__file__), os.pardir, 'aimless', 'skel',
                        'tpl')
@@ -147,8 +149,11 @@ class TestAimlessShooter(unittest.TestCase):
         init_dir(self.tgt_dir, COORDS_LOC)
         self.handler.submit = MagicMock(return_value=TEST_ID)
         self.handler.stat_jobs.side_effect = [{TEST_ID: "something"}, {}]
+        self._write_test_files(self.tgt_dir)
         self.aimless.run_calcs(1)
         self.assertEqual(2, self.handler.stat_jobs.call_count)
+        self._chk_bak(1)
+        self.assertTrue(os.path.exists(os.path.join(self.tgt_dir, BACK_RST_NAME)))
 
     def test_calcs_three_paths(self):
         init_dir(self.tgt_dir, COORDS_LOC)
@@ -156,9 +161,19 @@ class TestAimlessShooter(unittest.TestCase):
         self.handler.stat_jobs.side_effect = [{TEST_ID: "something"}, {},
                                               {TEST_ID2: "something"}, {TEST_ID2: "something"}, {},
                                               {TEST_ID3: "something"}, {}]
+        self._write_test_files(self.tgt_dir)
         self.aimless.run_calcs(3)
         self.assertEqual(7, self.handler.stat_jobs.call_count)
+        for pnum in range(1, 4):
+            self._chk_bak(pnum)
 
+    def _write_test_files(self, tgt_dir):
+        shutil.copy2(os.path.join(TEST_DATA_DIR, FWD_RST_NAME), tgt_dir)
+
+    def _chk_bak(self, pnum):
+        path_out_dir = os.path.join(self.tgt_dir, OUT_DIR, str(pnum))
+        for tfile in os.listdir(TEST_DATA_DIR):
+            self.assertTrue(os.path.exists(os.path.join(path_out_dir, tfile)))
 
     def tearDown(self):
         shutil.rmtree(self.tgt_dir)
