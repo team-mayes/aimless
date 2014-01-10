@@ -22,9 +22,12 @@ from aimless.aimless import (calc_params, TOTAL_STEPS_KEY, BW_STEPS_KEY,
                              FW_STEPS_KEY, DT_STEPS_KEY, BW_OUT_KEY,
                              FW_OUT_KEY, DT_OUT_KEY, write_tpl_files,
                              TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME)
+from aimless.common import STATES
 from aimless.main import (CFG_DEFAULTS, TGT_DIR_KEY)
 
 # Test Constants #
+from aimless.torque import JobStatus
+
 TEST_ID = 11
 TEST_ID2 = 22
 TEST_ID3 = 33
@@ -47,6 +50,33 @@ MDCRD_LOC = 'test_mdcrd'
 AMBER_REF_NAME = 'amber_job.result'
 COORDS_LOC = os.path.join(INPUT_DIR, 'test_coords.rst')
 TOPO_LOC = os.path.join(INPUT_DIR, 'test_topo.rst')
+
+def file_cmp(new_tgt, ref_tgt):
+    if not filecmp.cmp(new_tgt, ref_tgt):
+        with open(new_tgt, 'r') as new_file, open(ref_tgt, 'r') \
+            as ref_file:
+            diff = difflib.context_diff(new_file.readlines(),
+                                        ref_file.readlines())
+            delta = ''.join(diff)
+            print delta
+            return False
+    else:
+        return True
+
+def cmp_not_first(new_tgt, ref_tgt, test_class):
+    with open(ref_tgt) as ref_file:
+        ref_lines = [line.rstrip('\n') for line in ref_file]
+    with open(new_tgt) as new_file:
+        new_lines = [line.rstrip('\n') for line in new_file]
+
+    if len(ref_lines) != len(new_lines):
+        print "Lines differ: ref: %d, new %d" % (len(ref_lines), len(new_lines))
+
+    for lnum in range(1, len(ref_lines)):
+        test_class.assertEqual(ref_lines[lnum], new_lines[lnum],
+                               "Diff: %s vs. %s" %
+                               (ref_lines[lnum], new_lines[lnum]))
+
 
 # Tests #
 class TestCalc(unittest.TestCase):
@@ -98,14 +128,8 @@ class TestWriteTpls(unittest.TestCase):
             new_tgt = os.path.join(tgt_dir, tgt_name)
             self.assertTrue(os.path.exists(new_tgt))
             ref_tgt = os.path.join(TPL_RESULT_DIR, tgt_name)
-            if not filecmp.cmp(new_tgt, ref_tgt):
-                with open(new_tgt, 'r') as new_file, open(ref_tgt, 'r') \
-                    as ref_file:
-                    diff = difflib.context_diff(new_file.readlines(),
-                                                ref_file.readlines())
-                    delta = ''.join(diff)
-                    print delta
-                    self.fail(new_tgt + " did not match.")
+            if not file_cmp(new_tgt, ref_tgt):
+                self.fail(new_tgt + " did not match.")
 
     def _del_tgts(self, tgt_dir):
         "Deletes the target files in the target directory."
@@ -129,6 +153,7 @@ class TestAimlessShooter(unittest.TestCase):
                                       TOPO_LOC, dict(),
                                       sub_handler=self.handler,
                                       out=self.out, wait_secs=.001)
+        self.fwd_name = os.path.join(self.tgt_dir, FWD_RST_NAME)
 
     def test_sub(self):
         self.aimless.topo_loc = 'test_topo.file'
@@ -141,14 +166,22 @@ class TestAimlessShooter(unittest.TestCase):
             self.assertEqual(ref_contents, job.contents)
 
     def test_wait(self):
-        self.handler.stat_jobs.side_effect = [{TEST_ID: "something"}, {}]
-        self.aimless._wait_on_jobs([TEST_ID])
+        stat = JobStatus(job_state = STATES.QUEUED)
+        self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {}]
+        self.aimless._wait_on_jobs([TEST_ID, TEST_ID2])
         self.assertEqual(2, self.handler.stat_jobs.call_count)
+
+    def test_wait_complete(self):
+        stat = JobStatus(job_state = STATES.COMPLETED)
+        self.handler.stat_jobs.side_effect = [{TEST_ID: stat}]
+        self.aimless._wait_on_jobs([TEST_ID, TEST_ID2])
+        self.assertEqual(1, self.handler.stat_jobs.call_count)
 
     def test_calcs_single_path(self):
         init_dir(self.tgt_dir, COORDS_LOC)
         self.handler.submit = MagicMock(return_value=TEST_ID)
-        self.handler.stat_jobs.side_effect = [{TEST_ID: "something"}, {}]
+        stat = JobStatus(job_state = STATES.QUEUED)
+        self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {}]
         self._write_test_files(self.tgt_dir)
         self.aimless.run_calcs(1)
         self.assertEqual(2, self.handler.stat_jobs.call_count)
@@ -158,9 +191,10 @@ class TestAimlessShooter(unittest.TestCase):
     def test_calcs_three_paths(self):
         init_dir(self.tgt_dir, COORDS_LOC)
         self.handler.submit.side_effect = [TEST_ID, TEST_ID2, TEST_ID3]
-        self.handler.stat_jobs.side_effect = [{TEST_ID: "something"}, {},
-                                              {TEST_ID2: "something"}, {TEST_ID2: "something"}, {},
-                                              {TEST_ID3: "something"}, {}]
+        stat = JobStatus(job_state = STATES.QUEUED)
+        self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {},
+                                              {TEST_ID2: stat}, {TEST_ID2: stat}, {},
+                                              {TEST_ID3: stat}, {}]
         self._write_test_files(self.tgt_dir)
         self.aimless.run_calcs(3)
         self.assertEqual(7, self.handler.stat_jobs.call_count)
@@ -168,15 +202,52 @@ class TestAimlessShooter(unittest.TestCase):
             self._chk_bak(pnum)
 
     def _write_test_files(self, tgt_dir):
-        shutil.copy2(os.path.join(TEST_DATA_DIR, FWD_RST_NAME), tgt_dir)
+        shutil.copy2(os.path.join(TEST_DATA_DIR, "even_forward.rst"), self.fwd_name)
 
     def _chk_bak(self, pnum):
         path_out_dir = os.path.join(self.tgt_dir, OUT_DIR, str(pnum))
-        for tfile in os.listdir(TEST_DATA_DIR):
-            self.assertTrue(os.path.exists(os.path.join(path_out_dir, tfile)))
+        self.assertTrue(os.path.exists(os.path.join(path_out_dir, FWD_RST_NAME)))
 
     def tearDown(self):
         shutil.rmtree(self.tgt_dir)
+
+class TestReverse(unittest.TestCase):
+    """
+    Verify results for AimlessShooter.rev_vel
+    """
+
+    def setUp(self):
+        self.tgt_dir = tempfile.mkdtemp()
+        self.out = StringIO.StringIO()
+        self.handler = MagicMock()
+        self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
+                                      TOPO_LOC, dict(),
+                                      sub_handler=self.handler,
+                                      out=self.out, wait_secs=.001)
+        self.fwd_name = os.path.join(self.tgt_dir, FWD_RST_NAME)
+        self.back_name = os.path.join(self.tgt_dir, BACK_RST_NAME)
+
+    def test_even(self):
+        ref_name = os.path.join(TEST_DATA_DIR, "even_backward.rst")
+        shutil.copy2(os.path.join(TEST_DATA_DIR, "even_forward.rst"), self.fwd_name)
+        self.aimless.rev_vel()
+        cmp_not_first(self.back_name, ref_name, self)
+
+    def test_even(self):
+        ref_name = os.path.join(TEST_DATA_DIR, "odd_backward.rst")
+        shutil.copy2(os.path.join(TEST_DATA_DIR, "odd_forward.rst"), self.fwd_name)
+        self.aimless.rev_vel()
+        cmp_not_first(self.back_name, ref_name, self)
+
+    def test_small_even(self):
+        ref_name = os.path.join(TEST_DATA_DIR, "even_small_back.rst")
+        shutil.copy2(os.path.join(TEST_DATA_DIR, "even_small_fwd.rst"), self.fwd_name)
+        self.aimless.rev_vel()
+        cmp_not_first(self.back_name, ref_name, self)
+
+    def tearDown(self):
+        shutil.rmtree(self.tgt_dir)
+
 
 # Default Runner #
 if __name__ == '__main__':

@@ -7,12 +7,14 @@ from string import Template
 import sys
 import time
 import datetime
+import math
 from common import STATES
 from torque import TorqueJob, TorqueSubmissionHandler
 
 # Constants #
 DEF_WAIT_SECS = 10
 TSTAMP_FMT = '%Y-%m-%d %H:%M:%S'
+FLOAT_FMT = " % 11.7f"
 
 # Config Sections #
 MAIN_SEC = 'main'
@@ -201,16 +203,32 @@ class AimlessShooter(object):
         shutil.copy2(os.path.join(self.tgt_dir, src_file), path_out_dir)
 
     def rev_vel(self):
-        self.out.write('running dt\n')
+        self.out.write('reversing velocities\n')
         fwd_loc = os.path.join(self.tgt_dir, FWD_RST_NAME)
         back_loc = os.path.join(self.tgt_dir, BACK_RST_NAME)
         with open(fwd_loc) as fwd_file:
             fwd_lines = [line.rstrip('\n') for line in fwd_file]
         with open(back_loc, 'w') as back_file:
-            back_file.write(fwd_lines[0])
-            back_file.write("Made by '%s' at %s\n" % (os.path.basename(__file__),
+            back_file.write(fwd_lines[0].split()[0])
+            back_file.write(" Made by %s at %s\n" % (os.path.basename(__file__),
                                                       datetime.datetime.now().
                                                       strftime(TSTAMP_FMT)))
+            back_file.write(fwd_lines[1] + os.linesep)
+            # TODO: Use number of lines to figure out
+            num_atoms = float(fwd_lines[1].split()[0])
+            # Atom coordinates are two per line
+            coord_lines = int(math.ceil(num_atoms / 2.0))
+            # Don't touch the coordinates
+            for sameline in range(2, coord_lines + 2):
+                back_file.write(fwd_lines[sameline] + os.linesep)
+            #Reverse the velocities
+            for revline in range(2 + coord_lines, (coord_lines * 2) + 2):
+                fline = map(float, fwd_lines[revline].split())
+                back_file.write("".join(FLOAT_FMT % -num for num in fline))
+                back_file.write(os.linesep)
+            # Write out last line
+            back_file.write(fwd_lines[-1])
+
             # TODO: Port the rest of revvels.x
 
     def _wait_on_jobs(self, job_ids):
