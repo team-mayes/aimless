@@ -26,6 +26,9 @@ XTWO_RST = "x2.rst"
 SHOOTER_RST = "shooter.rst"
 FWD_RST_NAME = "forward.rst"
 BACK_RST_NAME = "backward.rst"
+POSTDT_RST_NAME = "postdt.rst"
+POSTFWD_RST_NAME = "postforward.rst"
+POSTBACK_RST_NAME = "postbackward.rst"
 AMBER_JOB_TPL = 'amber_job.tpl'
 OUT_DIR = 'output'
 
@@ -36,15 +39,15 @@ DT_IN_NAME = "indt.in"
 STARTER_IN_NAME = "instarter.in"
 
 # Directional Output Files #
-BACK_OUT_NAME = "inbackward.out"
-FWD_OUT_NAME = "inforward.out"
-DT_OUT_NAME = "indt.out"
-STARTER_OUT_NAME = "instarter.out"
+BACK_OUT_NAME = "backward.out"
+FWD_OUT_NAME = "forward.out"
+DT_OUT_NAME = "dt.out"
+STARTER_OUT_NAME = "starter.out"
 
 # MDCRD files
-BACK_MDCRD_NAME = "inbackward.out"
-FWD_MDCRD_NAME = "inforward.out"
-DT_MDCRD_NAME = "indt.out"
+BACK_MDCRD_NAME = "backward.mdcrd"
+FWD_MDCRD_NAME = "forward.mdcrd"
+DT_MDCRD_NAME = "dt.mdcrd"
 STARTER_MDCRD_NAME = "starter.mdcrd"
 
 # Config Keys #
@@ -140,9 +143,8 @@ def is_running(keys, tgt):
             stat = tgt[tkey]
             if stat.job_state != STATES.COMPLETED:
                 return True
-            else:
-                logger.info("Job %s complete" % tkey)
     return False
+
 
 class AimlessShooter(object):
     """
@@ -161,75 +163,93 @@ class AimlessShooter(object):
         self.out = out
         self.wait_secs = wait_secs
 
-    def run_dt(self):
-        self.out.write('running dt\n')
-        start_id = self._sub_job(os.path.join(self.tgt_dir, FWD_RST_NAME),
-                                 os.path.join(self.tgt_dir, FWD_IN_NAME),
-                                 os.path.join(self.tgt_dir, STARTER_IN_NAME),
-                                 os.path.join(self.tgt_dir, STARTER_OUT_NAME),
-                                 os.path.join(self.tgt_dir, STARTER_MDCRD_NAME),
-        )
-        self._wait_on_jobs([start_id])
+    def run_calcs(self, num_paths):
+        for pnum in range(1, num_paths + 1):
+            if random.randint(0, 1):
+                shooter = self.tgtres(XONE_RST)
+            else:
+                shooter = self.tgtres(XTWO_RST)
+            self.out.write("Using '%s'\n" % shooter)
+            shutil.copy2(shooter, self.tgtres(SHOOTER_RST))
+            self.run_starter(pnum, shooter)
+            self.rev_vel()
+            self.run_dt()
+            self.run_fwd_and_back()
 
     def run_starter(self, pnum, shooter):
         self.out.write('running starter... generating velocities\n')
-        start_id = self._sub_job(shooter, os.path.join(self.tgt_dir, FWD_IN_NAME),
-                                 os.path.join(self.tgt_dir, STARTER_IN_NAME),
-                                 os.path.join(self.tgt_dir, STARTER_OUT_NAME),
-                                 os.path.join(self.tgt_dir, STARTER_MDCRD_NAME),
+        start_id = self._sub_job(shooter,
+                                 self.tgtres(FWD_IN_NAME),
+                                 self.tgtres(STARTER_IN_NAME),
+                                 self.tgtres(STARTER_OUT_NAME),
+                                 self.tgtres(STARTER_MDCRD_NAME),
         )
         self._wait_on_jobs([start_id])
         self.path_backup(FWD_RST_NAME, pnum)
 
-    def run_calcs(self, num_paths):
-        for pnum in range(1, num_paths + 1):
-            if random.randint(0, 1):
-                shooter = os.path.join(self.tgt_dir, XONE_RST)
-            else:
-                shooter = os.path.join(self.tgt_dir, XTWO_RST)
-            self.out.write("Using '%s'\n" % shooter)
-            shutil.copy2(shooter, os.path.join(self.tgt_dir, SHOOTER_RST))
-            self.run_starter(pnum, shooter)
-            self.rev_vel()
-
-    def path_backup(self, src_file, pnum):
-        """
-        Creates a backup of 'src_file' in the output directory for 'pnum'.
-        """
-        path_out_dir = os.path.join(self.tgt_dir, OUT_DIR, str(pnum))
-        if not os.path.exists(path_out_dir):
-            os.makedirs(path_out_dir)
-
-        shutil.copy2(os.path.join(self.tgt_dir, src_file), path_out_dir)
-
     def rev_vel(self):
         self.out.write('reversing velocities\n')
-        fwd_loc = os.path.join(self.tgt_dir, FWD_RST_NAME)
-        back_loc = os.path.join(self.tgt_dir, BACK_RST_NAME)
+        fwd_loc = self.tgtres(FWD_RST_NAME)
+        back_loc = self.tgtres(BACK_RST_NAME)
         with open(fwd_loc) as fwd_file:
             fwd_lines = [line.rstrip('\n') for line in fwd_file]
         with open(back_loc, 'w') as back_file:
             back_file.write(fwd_lines[0].split()[0])
             back_file.write(" Made by %s at %s\n" % (os.path.basename(__file__),
-                                                      datetime.datetime.now().
-                                                      strftime(TSTAMP_FMT)))
+                                                     datetime.datetime.now().
+                                                     strftime(TSTAMP_FMT)))
             back_file.write(fwd_lines[1] + os.linesep)
-            # TODO: Use number of lines to figure out
             num_atoms = float(fwd_lines[1].split()[0])
             # Atom coordinates are two per line
             coord_lines = int(math.ceil(num_atoms / 2.0))
             # Don't touch the coordinates
             for sameline in range(2, coord_lines + 2):
                 back_file.write(fwd_lines[sameline] + os.linesep)
-            #Reverse the velocities
+                #Reverse the velocities
             for revline in range(2 + coord_lines, (coord_lines * 2) + 2):
                 fline = map(float, fwd_lines[revline].split())
                 back_file.write("".join(FLOAT_FMT % -num for num in fline))
                 back_file.write(os.linesep)
-            # Write out last line
+                # Write out last line
             back_file.write(fwd_lines[-1])
 
-            # TODO: Port the rest of revvels.x
+    def run_dt(self):
+        self.out.write('running dt\n')
+        start_id = self._sub_job(self.tgtres(FWD_RST_NAME),
+                                 self.tgtres(POSTDT_RST_NAME),
+                                 self.tgtres(DT_IN_NAME),
+                                 self.tgtres(DT_OUT_NAME),
+                                 self.tgtres(DT_MDCRD_NAME),
+        )
+        self._wait_on_jobs([start_id])
+
+    def run_fwd_and_back(self):
+        self.out.write('running forward\n')
+        fwd_id = self._sub_job(self.tgtres(POSTDT_RST_NAME),
+                               self.tgtres(POSTFWD_RST_NAME),
+                               self.tgtres(FWD_IN_NAME),
+                               self.tgtres(FWD_OUT_NAME),
+                               self.tgtres(FWD_MDCRD_NAME),
+        )
+
+        self.out.write('running backward\n')
+        back_id = self._sub_job(self.tgtres(POSTFWD_RST_NAME),
+                                self.tgtres(POSTBACK_RST_NAME),
+                                self.tgtres(BACK_IN_NAME),
+                                self.tgtres(BACK_OUT_NAME),
+                                self.tgtres(BACK_MDCRD_NAME),
+        )
+        self._wait_on_jobs([fwd_id, back_id])
+
+    def path_backup(self, src_file, pnum):
+        """
+        Creates a backup of 'src_file' in the output directory for 'pnum'.
+        """
+        path_out_dir = self.tgtres(OUT_DIR, str(pnum))
+        if not os.path.exists(path_out_dir):
+            os.makedirs(path_out_dir)
+
+        shutil.copy2(self.tgtres(src_file), path_out_dir)
 
     def _wait_on_jobs(self, job_ids):
         jstats = self.sub_handler.stat_jobs(job_ids)
@@ -260,3 +280,6 @@ class AimlessShooter(object):
         logger.info("Submitting:\n%s" % result)
         job.contents = result
         return self.sub_handler.submit(job)
+
+    def tgtres(self, *args):
+        return os.path.join(self.tgt_dir, *args)

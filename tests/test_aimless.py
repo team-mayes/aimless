@@ -31,6 +31,15 @@ from aimless.torque import JobStatus
 TEST_ID = 11
 TEST_ID2 = 22
 TEST_ID3 = 33
+TEST_ID4 = 44
+TEST_ID5 = 55
+TEST_ID6 = 66
+TEST_ID7 = 77
+TEST_ID8 = 88
+TEST_ID9 = 99
+TEST_ID10 = 100
+TEST_ID11 = 110
+TEST_ID12 = 120
 TS_VAL = 1000
 FWBW_VAL = TS_VAL / 2
 DT_VAL = TS_VAL / 100
@@ -51,6 +60,7 @@ AMBER_REF_NAME = 'amber_job.result'
 COORDS_LOC = os.path.join(INPUT_DIR, 'test_coords.rst')
 TOPO_LOC = os.path.join(INPUT_DIR, 'test_topo.rst')
 
+
 def file_cmp(new_tgt, ref_tgt):
     if not filecmp.cmp(new_tgt, ref_tgt):
         with open(new_tgt, 'r') as new_file, open(ref_tgt, 'r') \
@@ -62,6 +72,7 @@ def file_cmp(new_tgt, ref_tgt):
             return False
     else:
         return True
+
 
 def cmp_not_first(new_tgt, ref_tgt, test_class):
     with open(ref_tgt) as ref_file:
@@ -166,38 +177,45 @@ class TestAimlessShooter(unittest.TestCase):
             self.assertEqual(ref_contents, job.contents)
 
     def test_wait(self):
-        stat = JobStatus(job_state = STATES.QUEUED)
+        stat = JobStatus(job_state=STATES.QUEUED)
         self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {}]
         self.aimless._wait_on_jobs([TEST_ID, TEST_ID2])
         self.assertEqual(2, self.handler.stat_jobs.call_count)
 
     def test_wait_complete(self):
-        stat = JobStatus(job_state = STATES.COMPLETED)
+        stat = JobStatus(job_state=STATES.COMPLETED)
         self.handler.stat_jobs.side_effect = [{TEST_ID: stat}]
         self.aimless._wait_on_jobs([TEST_ID, TEST_ID2])
         self.assertEqual(1, self.handler.stat_jobs.call_count)
 
     def test_calcs_single_path(self):
         init_dir(self.tgt_dir, COORDS_LOC)
-        self.handler.submit = MagicMock(return_value=TEST_ID)
-        stat = JobStatus(job_state = STATES.QUEUED)
-        self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {}]
+        self.handler.submit.side_effect = [TEST_ID, TEST_ID2, TEST_ID3, TEST_ID4]
+        stat = JobStatus(job_state=STATES.QUEUED)
+        statc = JobStatus(job_state=STATES.COMPLETED)
+        self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {}, {TEST_ID2: stat},
+                                              {TEST_ID2: statc},
+                                              {TEST_ID3: statc, TEST_ID4: statc}]
         self._write_test_files(self.tgt_dir)
         self.aimless.run_calcs(1)
-        self.assertEqual(2, self.handler.stat_jobs.call_count)
+        self.assertEqual(5, self.handler.stat_jobs.call_count)
         self._chk_bak(1)
         self.assertTrue(os.path.exists(os.path.join(self.tgt_dir, BACK_RST_NAME)))
 
     def test_calcs_three_paths(self):
         init_dir(self.tgt_dir, COORDS_LOC)
-        self.handler.submit.side_effect = [TEST_ID, TEST_ID2, TEST_ID3]
-        stat = JobStatus(job_state = STATES.QUEUED)
+        self.handler.submit.side_effect = [TEST_ID, TEST_ID2, TEST_ID3, TEST_ID4,
+                                           TEST_ID5, TEST_ID6, TEST_ID7, TEST_ID8,
+                                           TEST_ID9, TEST_ID10, TEST_ID11, TEST_ID12, ]
+        stat = JobStatus(job_state=STATES.QUEUED)
+        statc = JobStatus(job_state=STATES.COMPLETED)
         self.handler.stat_jobs.side_effect = [{TEST_ID: stat}, {},
                                               {TEST_ID2: stat}, {TEST_ID2: stat}, {},
-                                              {TEST_ID3: stat}, {}]
+            {}, {TEST_ID5: stat}, {}, {TEST_ID6: statc}, {},
+                                              {TEST_ID9: statc}, {TEST_ID10: statc}, {}, ]
         self._write_test_files(self.tgt_dir)
         self.aimless.run_calcs(3)
-        self.assertEqual(7, self.handler.stat_jobs.call_count)
+        self.assertEqual(13, self.handler.stat_jobs.call_count)
         for pnum in range(1, 4):
             self._chk_bak(pnum)
 
@@ -210,6 +228,7 @@ class TestAimlessShooter(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.tgt_dir)
+
 
 class TestReverse(unittest.TestCase):
     """
