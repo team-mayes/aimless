@@ -3,6 +3,12 @@
 History
 -------
 
+0.3.0 (2014-01-12)
+++++++++++++++++++
+
+* First try at all calcs plus basin analysis.
+* Filled in pydoc.
+
 0.2.1 (2014-01-09)
 ++++++++++++++++++
 

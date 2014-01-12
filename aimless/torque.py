@@ -31,6 +31,16 @@ def parse_id(raw_str):
     else:
         raise OutputParsingError("Could not properly split output %s" % raw_str)
 
+def is_running(ids, tgt):
+    """Returns whether any jobs with the given IDs are running.
+    """
+    for jid in ids:
+        if jid in tgt:
+            stat = tgt[jid]
+            if stat.job_state != STATES.COMPLETED:
+                return True
+    return False
+
 class TorqueJob(StructEq, AutoRepr):
     "Represents a job to run.  Includes reasonable control defaults."
     

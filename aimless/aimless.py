@@ -9,7 +9,7 @@ import time
 import datetime
 import math
 from common import STATES, enum
-from torque import TorqueJob, TorqueSubmissionHandler
+from torque import TorqueJob, TorqueSubmissionHandler, is_running
 
 # Constants #
 DEF_WAIT_SECS = 10
@@ -110,8 +110,7 @@ class EnvError(Exception):
 # Logic #
 
 def calc_params(total_steps):
-    """
-    Returns a dict with calculated values based on the given number of total
+    """Returns a dict with calculated values based on the given number of total
     steps.
     """
     results = {TOTAL_STEPS_KEY: total_steps}
@@ -123,7 +122,7 @@ def calc_params(total_steps):
     results[DT_OUT_KEY] = results[DT_STEPS_KEY] - 1
     return results
 
-
+# Associates the template with the target file name and a description of its purpose.
 TPL_LIST = [
     ("cons.tpl", "cons.rst",
      "force constants are zero - this is just to get final bond lengths"),
@@ -134,8 +133,14 @@ TPL_LIST = [
     ("inbackward.tpl", BACK_IN_NAME, "backward portion of the trajectory"),
 ]
 
-# TODO: Move write_tpl_files and init_dir to AimlessShooter
 def write_tpl_files(tpl_dir, tgt_dir, params):
+    """Writes the templates in tpl_dir to tgt_dir using params as the source
+    for template values
+
+    tpl_dir -- The directory containing the templates.
+    tgt_dir -- The target directory for the filled templates.
+    params -- A dict of parameters to use when filling the templates.
+    """
     for tpl_name, tgt_name, tpl_desc in TPL_LIST:
         tpl_loc = os.path.join(tpl_dir, tpl_name)
         try:
@@ -154,32 +159,46 @@ def write_tpl_files(tpl_dir, tgt_dir, params):
                 "Couldn't read template '%s' (this template creates '%s' for '%s'): %s" % (
                     tpl_loc, tgt_name, tpl_desc, e))
 
-
 def init_dir(tgt_dir, coords_loc):
+    """Copies the coordinates location to x1 and x2."""
     shutil.copy2(coords_loc, os.path.join(tgt_dir, XONE_RST))
     shutil.copy2(coords_loc, os.path.join(tgt_dir, XTWO_RST))
 
-# TODO: Consider moving this to torque
-def is_running(keys, tgt):
-    """Returns whether any jobs are running.
-    """
-    for tkey in keys:
-        if tkey in tgt:
-            stat = tgt[tkey]
-            if stat.job_state != STATES.COMPLETED:
-                return True
-    return False
+def write_report(pres, tgt=sys.stdout):
+    """Creates a human-readable plain text report for the given path results.
 
+    Positional arguments:
+    pres -- The path results.
+    Keyword arguments:
+    tgt -- The target to write to (stdout by default)
+    """
+    # TODO: Write report
+    pass
 
 class AimlessShooter(object):
-    """
-    Encapsulates the process of running and analyzing compute jobs related
+    """Encapsulates the process of running and analyzing compute jobs related
     to the Aimless Shooting modeling technique.
     """
 
     def __init__(self, tpl_dir, tgt_dir, topo_loc, job_params, basins_params,
                  sub_handler=TorqueSubmissionHandler(), out=sys.stdout,
                  wait_secs=DEF_WAIT_SECS):
+        """Sets up the initial state for this instance.
+
+        Positional Arguments:
+        tpl_dir -- The directory containing the templates.
+        tgt_dir -- The working directory for this calculation.
+        topo_loc -- Location of the topology file.
+        job_params -- Dict of parameters used for filling in the Amber job
+                      templates.
+        basins_params -- Dict of parameters used for running basin calculations.
+        Keyword Arguments:
+        sub_handler -- The submission handler for jobs (defaults to
+                        TorqueSubmissionHandler)
+        out -- The target for output (defaults to stdout)
+        wait_secs -- The length of time to wait while polling jobs (defaults to
+                     10 seconds).
+        """
         self.tgt_dir = tgt_dir
         self.tpl_dir = tpl_dir
         self.topo_loc = topo_loc
@@ -192,6 +211,15 @@ class AimlessShooter(object):
         self.x2_loc = self.tgtres(XTWO_RST)
 
     def run_calcs(self, num_paths):
+        """Top-level runner for performing the aimless shooting calculations
+        for the given number of paths, returning the results.
+
+        Positional arguments:
+        num_paths -- The number of paths to run.
+        Returns:
+        A nested dict keyed first by path, then by 'forward' and 'backward',
+        with the values being the result of calc_basins for each path.
+        """
         pres = {}
         for pnum in range(1, num_paths + 1):
             if random.randint(0, 1):
@@ -206,9 +234,15 @@ class AimlessShooter(object):
             pres[pnum] = self.calc_basins()
             self.proc_results(pres[pnum], shooter)
             self.clean(pnum)
-        self.write_report(pres)
+        return pres
 
     def run_starter(self, pnum, shooter):
+        """Runs the starter job, backing up the generated forward file.
+        Returns when the submitted job is finished.
+
+        pnum -- The path number currently running.
+        shooter -- The chosen shooter file for this path.
+        """
         self.out.write('running starter... generating velocities\n')
         start_id = self._sub_job(shooter,
                                  self.tgtres(FWD_IN_NAME),
@@ -224,6 +258,8 @@ class AimlessShooter(object):
         shutil.copy2(self.tgtres(FWD_RST_NAME), path_out_dir)
 
     def rev_vel(self):
+        """Generates the backward.rst file based on the contents of forward.rst.
+        """
         self.out.write('reversing velocities\n')
         fwd_loc = self.tgtres(FWD_RST_NAME)
         back_loc = self.tgtres(BACK_RST_NAME)
@@ -250,6 +286,13 @@ class AimlessShooter(object):
             back_file.write(fwd_lines[-1])
 
     def calc_basins(self):
+        """Performs the basin calculations for the current forward and bad
+        backward cons data files.
+
+        Returns a dict with the results (a, b, or i) keyed to 'forward'
+        and 'backward'.  The results also contain 'RC1fw', 'RC1bw', 'RC2fw',
+        and 'RC2bw'.
+        """
         results = {}
         fwd_loc = self.tgtres(FWD_CONS_NAME)
         back_loc = self.tgtres(BACK_CONS_NAME)
@@ -268,6 +311,8 @@ class AimlessShooter(object):
         return results
 
     def run_dt(self):
+        """Submits the DT job. Returns when the submitted job is finished.
+        """
         self.out.write('running dt\n')
         start_id = self._sub_job(self.tgtres(FWD_RST_NAME),
                                  self.tgtres(POSTDT_RST_NAME),
@@ -278,6 +323,9 @@ class AimlessShooter(object):
         self._wait_on_jobs([start_id])
 
     def run_fwd_and_back(self):
+        """Submits the forward and backward jobs concurrently. Returns when
+        the submitted jobs are finished.
+        """
         self.out.write('running forward\n')
         fwd_id = self._sub_job(self.tgtres(POSTDT_RST_NAME),
                                self.tgtres(POSTFWD_RST_NAME),
@@ -296,6 +344,11 @@ class AimlessShooter(object):
         self._wait_on_jobs([fwd_id, back_id])
 
     def _wait_on_jobs(self, job_ids):
+        """Polls the state of the given job IDs.  Returns when the IDs
+        disappear from the status dict or the job's status is 'complete'.
+
+        job_ids -- The list of IDs to wait for.
+        """
         jstats = self.sub_handler.stat_jobs(job_ids)
         wait_count = 1
         while is_running(job_ids, jstats):
@@ -308,6 +361,18 @@ class AimlessShooter(object):
                        (",".join(map(str, job_ids)), (wait_count - 1) * self.wait_secs))
 
     def _sub_job(self, shooter_loc, dir_rst_loc, in_loc, out_loc, mdcrd_loc):
+        """Fills the job template with the given parameters and submits the
+        job, returning the ID assigned to the job.
+
+        Positional arguments:
+        shooter_loc -- The location of the "shooter" file
+        dir_rst_loc -- The location of the <direction>.rst file to use
+        in_loc -- The location of the input file
+        out_loc -- The location of the output file
+        mdcrd_loc -- The location of the mdcrd file
+        Returns:
+        The ID of the submitted job
+        """
         local_params = self.job_params.copy()
         local_params[TOPO_KEY] = self.topo_loc
         local_params[SHOOTER_KEY] = shooter_loc
@@ -326,9 +391,21 @@ class AimlessShooter(object):
         return self.sub_handler.submit(job)
 
     def tgtres(self, *args):
+        """Alias for resolving the given path segments against the target
+        directory.
+        """
         return os.path.join(self.tgt_dir, *args)
 
     def find_basin_dir(self, rc1, rc2):
+        """Determines whether the given reaction coordinates are going toward
+        A, B, or neither (inconclusive).
+
+        Positional arguments:
+        rc1 -- The first reaction coordinate.
+        rc2 -- The second reaction coordinate.
+        Returns:
+        a, b, or i depending on which basin (if any) matches.
+        """
         if self.bp[RC1_LOW_A_KEY] < rc1 < self.bp[RC1_HIGH_A_KEY] \
             and self.bp[RC2_LOW_A_KEY] < rc2 < self.bp[RC2_HIGH_A_KEY]:
             return BRES.A
@@ -339,6 +416,9 @@ class AimlessShooter(object):
             return BRES.INCONCLUSIVE
 
     def proc_results(self, result, shooter):
+        """
+
+        """
         if (result[BASIN_FWD_KEY] == BRES.A and result[BASIN_BACK_KEY] ==
             BRES.B) or (result[BASIN_FWD_KEY] == BRES.B
                         and result[BASIN_BACK_KEY] == BRES.A):
@@ -354,7 +434,3 @@ class AimlessShooter(object):
             except Exception, e:
                 print(e)
                 logger.warn("Could not archive '%s' as it doesn't exist" % path_out_dir)
-
-    def write_report(self, pres):
-        # TODO: Write a run report (maybe also a CSV)
-        pass

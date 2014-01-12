@@ -11,8 +11,10 @@ import os
 import sys
 import optparse
 from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
-                     COORDS_KEY, calc_params, EnvError, write_tpl_files, init_dir)
-from aimless import NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY, AimlessShooter
+                     COORDS_KEY, calc_params, EnvError, write_tpl_files,
+                     init_dir, write_report)
+from aimless import (NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY,
+                     AimlessShooter)
 
 DEF_CFG_NAME = 'aimless.ini'
 TPL_DIR_KEY = 'tpldir'
@@ -61,12 +63,30 @@ logger.debug("Testing the logger")
 # Logic #
 
 def fetch_calc_params(config):
+    """
+    Calculates and returns the calculation parameters based on the contents of
+    the given configuration file.
+
+    Args:
+    config -- A ConfigParser-style object with a 'main' section containing
+              'numpaths' and 'totalsteps' values.
+    Returns:
+    A map of values used for filling in the templates used for the aimless
+    shooting calculations.
+    """
     params = calc_params(config.getint(MAIN_SEC, TOTAL_STEPS_KEY))
     params[NUM_PATHS_KEY] = config.getint(MAIN_SEC, NUM_PATHS_KEY)
     return params
 
 
 def write_tpls(config, params):
+    """
+    Fills the templates in the configuration's 'tpldir' and writes the results
+    to the configuration's 'tgtdir'.
+
+    config -- A ConfigParser-style object with a 'main' section containing
+              'tpldir' and 'tgtdir' values.
+    """
     tpl_dir = config.get(MAIN_SEC, TPL_DIR_KEY)
     if not os.path.exists(tpl_dir):
         raise EnvError("Template directory '%s' does not exist" % tpl_dir)
@@ -77,6 +97,14 @@ def write_tpls(config, params):
 
 
 def run(config):
+    """
+    Extracts configuration data for the AimlessShooting run, returning the
+    results of the execution.
+
+    Arguments:
+    config -- A ConfigParser-style object with the necessary sections and
+    values.
+    """
     num_paths = config.getint(MAIN_SEC, NUM_PATHS_KEY)
     tgt_dir = config.get(MAIN_SEC, TGT_DIR_KEY)
     tpl_dir = config.get(MAIN_SEC, TPL_DIR_KEY)
@@ -88,11 +116,19 @@ def run(config):
     topo_file = config.get(MAIN_SEC, TOPO_KEY)
     aims = AimlessShooter(tpl_dir, tgt_dir, topo_file,
                           dict(config.items(JOBS_SEC)), bparams)
-    aims.run_calcs(num_paths)
+    return aims.run_calcs(num_paths)
 
 # Command-line processing and control #
 
 def read_config(file_loc):
+    """
+    Loads and returns the configuration file from the given location.
+
+    Arguments:
+    file_loc -- The location of the configuration file.
+    Returns:
+    A ConfigParser object containing the file's configuration data.
+    """
     config = ConfigParser.ConfigParser()
     good_files = config.read(file_loc)
     if not good_files:
@@ -102,7 +138,8 @@ def read_config(file_loc):
         config.add_section(MAIN_SEC)
     if not config.has_section(JOBS_SEC):
         config.add_section(JOBS_SEC)
-
+    if not config.has_section(BASINS_SEC):
+        config.add_section(BASINS_SEC)
     return config
 
 
@@ -143,7 +180,8 @@ def main(argv=None):
     config = read_config(opts.cfg_file)
     params = fetch_calc_params(config)
     write_tpls(config, params)
-    run(config)
+    pres = run(config)
+    write_report(pres)
     return 0        # success
 
 
