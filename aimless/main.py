@@ -11,12 +11,17 @@ import os
 import sys
 import optparse
 from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
-                     COORDS_KEY, MAIN_SEC, calc_params, EnvError, write_tpl_files, init_dir, JOBS_SEC)
+                     COORDS_KEY, calc_params, EnvError, write_tpl_files, init_dir)
 from aimless import NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY, AimlessShooter
 
 DEF_CFG_NAME = 'aimless.ini'
 TPL_DIR_KEY = 'tpldir'
 TGT_DIR_KEY = 'tgtdir'
+
+# Config Sections #
+MAIN_SEC = 'main'
+JOBS_SEC = 'jobs'
+BASINS_SEC = 'basins'
 
 # TODO: Consider merging into aimless
 
@@ -37,21 +42,21 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger("aimless_main")
 logger.debug("Testing the logger")
 
-# Note that ConfigParser expects all of these values to be strings
-CFG_DEFAULTS = {
-    NUM_PATHS_KEY: '20',
-    TOTAL_STEPS_KEY: '2500',
-    TOPO_KEY: 'input/cel6a_solv.prmtop',
-    COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
-    TPL_DIR_KEY: 'tpl',
-    TGT_DIR_KEY: os.getcwd(),
-    NUMNODES_KEY: '1',
-    NUMCPUS_KEY: '8',
-    WALLTIME_KEY: '999:00:00',
-    MAIL_KEY: 'hmayes@hmayes.com',
-}
-
-JOBS_KEYS = [NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY]
+# # Note that ConfigParser expects all of these values to be strings
+# CFG_DEFAULTS = {
+#     NUM_PATHS_KEY: '20',
+#     TOTAL_STEPS_KEY: '2500',
+#     TOPO_KEY: 'input/cel6a_solv.prmtop',
+#     COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
+#     TPL_DIR_KEY: 'tpl',
+#     TGT_DIR_KEY: os.getcwd(),
+#     NUMNODES_KEY: '1',
+#     NUMCPUS_KEY: '8',
+#     WALLTIME_KEY: '999:00:00',
+#     MAIL_KEY: 'hmayes@hmayes.com',
+# }
+#
+# JOBS_KEYS = [NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY]
 
 # Logic #
 
@@ -77,17 +82,18 @@ def run(config):
     tpl_dir = config.get(MAIN_SEC, TPL_DIR_KEY)
     coords_file = config.get(MAIN_SEC, COORDS_KEY)
     init_dir(tgt_dir, coords_file)
-    jparams = dict()
-    for jkey in JOBS_KEYS:
-        jparams[jkey] = config.get(JOBS_SEC, jkey)
+    bparams = dict()
+    for bkey, bval in config.items(BASINS_SEC):
+        bparams[bkey] = float(bval)
     topo_file = config.get(MAIN_SEC, TOPO_KEY)
-    aims = AimlessShooter(tpl_dir, tgt_dir, topo_file, jparams)
+    aims = AimlessShooter(tpl_dir, tgt_dir, topo_file,
+                          dict(config.items(JOBS_SEC)), bparams)
     aims.run_calcs(num_paths)
 
 # Command-line processing and control #
 
 def read_config(file_loc):
-    config = ConfigParser.ConfigParser(defaults=CFG_DEFAULTS)
+    config = ConfigParser.ConfigParser()
     good_files = config.read(file_loc)
     if not good_files:
         logger.debug("Did not load config file %s" % file_loc)
