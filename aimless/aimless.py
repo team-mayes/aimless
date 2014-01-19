@@ -13,7 +13,7 @@ from torque import TorqueJob, TorqueSubmissionHandler, is_running
 
 # Constants #
 RES_DIR_FMT = "\t%-8s: %s%s"
-SUM_FMT = "%-8s: %d%s"
+SUM_FMT = "%-8s: %2d%s"
 ACC_KEY = "accepted"
 DEF_WAIT_SECS = 10
 TSTAMP_FMT = '%Y-%m-%d %H:%M:%S'
@@ -203,7 +203,7 @@ def write_text_report(pres, tgt=sys.stdout):
     tgt.write(SUM_FMT % ("Both B", bb_count, os.linesep))
 
 
-def write_csv_report(pres, tgt=sys.stdout):
+def write_csv_report(pres, tgt=sys.stdout, linesep=os.linesep):
     """Creates a CSV report for the given path results.
 
     Positional arguments:
@@ -211,11 +211,11 @@ def write_csv_report(pres, tgt=sys.stdout):
     Keyword arguments:
     tgt -- The target to write to (stdout by default)
     """
-    csv_writer = csv.writer(tgt)
-    csv_writer.writerow("path", BASIN_FWD_KEY, BASIN_BACK_KEY, ACC_KEY)
+    csv_writer = csv.writer(tgt, lineterminator=linesep)
+    csv_writer.writerow(["path", BASIN_FWD_KEY, BASIN_BACK_KEY, ACC_KEY])
     for path_id, res in pres.items():
-        csv_writer.writerow(path_id, res[BASIN_FWD_KEY], res[BASIN_BACK_KEY],
-                            "Y" if ACC_KEY in res else "N")
+        csv_writer.writerow([path_id, res[BASIN_FWD_KEY], res[BASIN_BACK_KEY],
+                            "Y" if ACC_KEY in res else "N"])
 
 
 class AimlessShooter(object):

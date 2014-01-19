@@ -11,7 +11,7 @@
 	backward: A
 	accepted: N
 
-Accepted: 1
-Rejected: 2
-Both A  : 1
-Both B  : 0
+Accepted:  1
+Rejected:  2
+Both A  :  1
+Both B  :  0

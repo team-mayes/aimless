@@ -1,0 +1,4 @@
+path,forward,backward,accepted
+1,A,B,Y
+2,I,B,N
+3,A,A,N
