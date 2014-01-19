@@ -21,7 +21,7 @@ import unittest
 from aimless.aimless import (calc_params, TOTAL_STEPS_KEY, BW_STEPS_KEY,
                              FW_STEPS_KEY, DT_STEPS_KEY, BW_OUT_KEY,
                              FW_OUT_KEY, DT_OUT_KEY, write_tpl_files,
-                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY)
+                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY, BASIN_FWD_KEY, BASIN_BACK_KEY, BRES, ACC_KEY, write_text_report)
 from aimless.common import STATES
 from aimless.main import (TGT_DIR_KEY)
 
@@ -240,7 +240,7 @@ class TestReverse(unittest.TestCase):
         self.out = StringIO.StringIO()
         self.handler = MagicMock()
         self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
-                                      TOPO_LOC, dict(), dict(),
+                                      TOPO_LOC, {}, {},
                                       sub_handler=self.handler,
                                       out=self.out, wait_secs=.001)
         self.fwd_name = os.path.join(self.tgt_dir, FWD_RST_NAME)
@@ -267,6 +267,18 @@ class TestReverse(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tgt_dir)
 
+
+tpres = {}
+tpres[1] = {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.B, ACC_KEY: True}
+tpres[2] = {BASIN_FWD_KEY: BRES.INC, BASIN_BACK_KEY: BRES.B}
+tpres[3] = {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.A}
+
+class TestReverse(unittest.TestCase):
+    def test_text(self):
+        tgt = StringIO.StringIO()
+        write_text_report(tpres, tgt)
+        with open(os.path.join(TEST_DATA_DIR, "test_report.txt")) as ref_rep:
+            self.assertEqual(ref_rep.read(), tgt.getvalue())
 
 # Default Runner #
 if __name__ == '__main__':

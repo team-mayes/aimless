@@ -12,7 +12,7 @@ import sys
 import optparse
 from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
                      COORDS_KEY, calc_params, EnvError, write_tpl_files,
-                     init_dir, write_report)
+                     init_dir, write_text_report)
 from aimless import (NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY,
                      AimlessShooter)
 
@@ -181,7 +181,7 @@ def main(argv=None):
     params = fetch_calc_params(config)
     write_tpls(config, params)
     pres = run(config)
-    write_report(pres)
+    write_text_report(pres)
     return 0        # success
 
 

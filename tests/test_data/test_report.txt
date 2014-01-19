@@ -1,0 +1,17 @@
+01:
+	forward : A
+	backward: B
+	accepted: Y
+02:
+	forward : I
+	backward: B
+	accepted: N
+03:
+	forward : A
+	backward: A
+	accepted: N
+
+Accepted: 1
+Rejected: 2
+Both A  : 1
+Both B  : 0
