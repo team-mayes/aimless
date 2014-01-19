@@ -12,13 +12,19 @@ import sys
 import optparse
 from aimless import (NUM_PATHS_KEY, TOTAL_STEPS_KEY, TOPO_KEY,
                      COORDS_KEY, calc_params, EnvError, write_tpl_files,
-                     init_dir, write_text_report)
-from aimless import (NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY,
+                     init_dir, write_text_report, write_csv_report,
                      AimlessShooter)
 
 DEF_CFG_NAME = 'aimless.ini'
 TPL_DIR_KEY = 'tpldir'
 TGT_DIR_KEY = 'tgtdir'
+TEXT_REPORT_KEY = 'text_report'
+CSV_REPORT_KEY = 'csv_report'
+
+TEXT_FMT = 't'
+CSV_FMT = 'c'
+VALID_FMTS = [TEXT_FMT, CSV_FMT]
+DEF_OUT_FMTS = TEXT_FMT
 
 # Config Sections #
 MAIN_SEC = 'main'
@@ -44,23 +50,17 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger("aimless_main")
 logger.debug("Testing the logger")
 
-# # Note that ConfigParser expects all of these values to be strings
-# CFG_DEFAULTS = {
-#     NUM_PATHS_KEY: '20',
-#     TOTAL_STEPS_KEY: '2500',
-#     TOPO_KEY: 'input/cel6a_solv.prmtop',
-#     COORDS_KEY: 'input/cel6amc_qmmm_tryTS.rst',
-#     TPL_DIR_KEY: 'tpl',
-#     TGT_DIR_KEY: os.getcwd(),
-#     NUMNODES_KEY: '1',
-#     NUMCPUS_KEY: '8',
-#     WALLTIME_KEY: '999:00:00',
-#     MAIL_KEY: 'hmayes@hmayes.com',
-# }
-#
-# JOBS_KEYS = [NUMNODES_KEY, NUMCPUS_KEY, WALLTIME_KEY, MAIL_KEY]
 
+class CfgError(Exception):
+    pass
+
+# Note that ConfigParser expects all of these values to be strings
+CFG_DEFAULTS = {
+    TEXT_REPORT_KEY: 'aimless_results.txt',
+    CSV_REPORT_KEY: 'aimless_results.csv',
+}
 # Logic #
+
 
 def fetch_calc_params(config):
     """
@@ -120,6 +120,7 @@ def run(config):
 
 # Command-line processing and control #
 
+
 def read_config(file_loc):
     """
     Loads and returns the configuration file from the given location.
@@ -129,7 +130,7 @@ def read_config(file_loc):
     Returns:
     A ConfigParser object containing the file's configuration data.
     """
-    config = ConfigParser.ConfigParser()
+    config = ConfigParser.ConfigParser(CFG_DEFAULTS)
     good_files = config.read(file_loc)
     if not good_files:
         logger.debug("Did not load config file %s" % file_loc)
@@ -159,8 +160,10 @@ def parse_cmdline(argv):
     # define options here:
     parser.add_option('-c', '--cfg_file', default=DEF_CFG_NAME,
                       help="Specify config file location.", metavar="CFG")
-    parser.add_option(# customized description; put --help last
-                      '-h', '--help', action='help',
+    parser.add_option('-o', '--out_formats', default=DEF_OUT_FMTS,
+                      help="Specify output formats (t and/or c).",
+                      metavar="FMTS")
+    parser.add_option('-h', '--help', action='help',
                       help='Show this help message and exit.')
 
     opts, args = parser.parse_args(argv)
@@ -171,6 +174,9 @@ def parse_cmdline(argv):
                      '"%s" ignored.' % (args,))
 
     # further process opts & args if necessary
+    for fmt in opts.out_formats:
+        if fmt not in VALID_FMTS:
+            parser.error("Unhandled output format '%s'\n" % fmt)
 
     return opts, args
 
@@ -181,7 +187,17 @@ def main(argv=None):
     params = fetch_calc_params(config)
     write_tpls(config, params)
     pres = run(config)
-    write_text_report(pres)
+
+    for fmt in opts.out_formats:
+        if fmt.lower() == TEXT_FMT:
+            with open(config.get(MAIN_SEC, TEXT_REPORT_KEY)) as txt_tgt:
+                write_text_report(pres, txt_tgt)
+        elif fmt.lower() == CSV_FMT:
+            with open(config.get(MAIN_SEC, CSV_REPORT_KEY)) as csv_tgt:
+                write_csv_report(pres, csv_tgt)
+        else:
+            raise CfgError("Unhandled output format '%s'" % fmt)
+
     return 0        # success
 
 
