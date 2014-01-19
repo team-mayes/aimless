@@ -19,7 +19,7 @@ history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 
 setup(
     name='aimless',
-    version='0.3.0',
+    version='0.4.0',
     description='A run script for submitting and processing aimless shooting simulations using AMBER.',
     long_description=readme + '\n\n' + history,
     author='Chris Mayes',
@@ -30,7 +30,7 @@ setup(
     ],
     entry_points = {
         'console_scripts': [
-            'aimless = aimless.main:main',
+            'aimless = aimless.aimless:main',
             'aimless_init = aimless.init_loc:main',
         ],
     },

@@ -3,6 +3,12 @@
 History
 -------
 
+0.4.0 (2014-01-19)
+++++++++++++++++++
+
+* Finished business logic.
+* Added text and CSV report formats.
+
 0.3.0 (2014-01-12)
 ++++++++++++++++++
 

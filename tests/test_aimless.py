@@ -23,7 +23,6 @@ from aimless.aimless import (calc_params, TOTAL_STEPS_KEY, BW_STEPS_KEY,
                              FW_OUT_KEY, DT_OUT_KEY, write_tpl_files,
                              TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY, BASIN_FWD_KEY, BASIN_BACK_KEY, BRES, ACC_KEY, write_text_report, write_csv_report)
 from aimless.common import STATES
-from aimless.main import (TGT_DIR_KEY)
 
 # Test Constants #
 from aimless.torque import JobStatus
@@ -281,7 +280,7 @@ class TestReports(unittest.TestCase):
         with open(os.path.join(TEST_DATA_DIR, "test_report.txt")) as ref_rep:
             self.assertEqual(ref_rep.read(), tgt.getvalue())
 
-    def test_text(self):
+    def test_csv(self):
         tgt = StringIO.StringIO()
         write_csv_report(tpres, tgt, linesep='\n')
         with open(os.path.join(TEST_DATA_DIR, "test_report.csv")) as ref_rep:
