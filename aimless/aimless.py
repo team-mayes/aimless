@@ -483,7 +483,12 @@ class AimlessShooter(object):
 
     def proc_results(self, result, shooter):
         """
+        Process the shooter results.  If there are conclusive results, accept
+        it and move the shooter to x1 and the post-dt to x2.  Mark the result
+        as "accepted."
 
+        result -- The basin calculation result.
+        shooter -- The shooter file to potentially move.
         """
         if (result[BASIN_FWD_KEY] == BRES.A and result[BASIN_BACK_KEY] ==
             BRES.B) or (result[BASIN_FWD_KEY] == BRES.B
@@ -494,12 +499,13 @@ class AimlessShooter(object):
 
     def clean(self, pnum):
         path_out_dir = self.tgtres(OUT_DIR, str(pnum))
+        if not os.path.exists(path_out_dir):
+            os.makedirs(path_out_dir)
         for mvname in GEN_FILES:
             tgt = self.tgtres(mvname)
             try:
                 shutil.move(tgt, path_out_dir)
             except Exception, e:
-                print(e)
                 logger.warn("Could not archive '%s': %s" % (path_out_dir, e))
 
 ### CLI ###
@@ -563,7 +569,7 @@ def write_tpls(config, params):
     write_tpl_files(tpl_dir, tgt_dir, params)
 
 
-def run(config):
+def run(config, tgt_class=AimlessShooter):
     """
     Extracts configuration data for the AimlessShooting run, returning the
     results of the execution.
@@ -581,7 +587,7 @@ def run(config):
     for bkey, bval in config.items(BASINS_SEC):
         bparams[bkey] = float(bval)
     topo_file = config.get(MAIN_SEC, TOPO_KEY)
-    aims = AimlessShooter(tpl_dir, tgt_dir, topo_file,
+    aims = tgt_class(tpl_dir, tgt_dir, topo_file,
                           dict(config.items(JOBS_SEC)), bparams)
     return aims.run_calcs(num_paths)
 
@@ -658,13 +664,12 @@ def parse_cmdline(argv):
     return opts, args
 
 
-def main(argv=None):
-    opts, args = parse_cmdline(argv)
-    config = read_config(opts.cfg_file)
-    params = fetch_calc_params(config)
-    write_tpls(config, params)
-    pres = run(config)
-
+def print_reports(config, opts, pres):
+    """
+    Produces reports from the given results.
+    """
+    # TODO: Consider rotation
+    # http://johnebailey.blogspot.com/2012/01/rolling-files-and-directories-with.html
     for fmt in opts.out_formats:
         if fmt.lower() == TEXT_FMT:
             txt_file = get(config, MAIN_SEC, TEXT_REPORT_KEY, DEF_TEXT_REPORT)
@@ -676,6 +681,23 @@ def main(argv=None):
                 write_csv_report(pres, csv_tgt)
         else:
             raise CfgError("Unhandled output format '%s'" % fmt)
+
+
+def main(argv=None):
+    """
+    Main entry point for the script.  Processes the arguments and config file,
+    using the results to run the script, finally producing the specified output
+    reports.
+
+    argv -- The CLI arguments to process.
+    """
+    opts, args = parse_cmdline(argv)
+    config = read_config(opts.cfg_file)
+    params = fetch_calc_params(config)
+    write_tpls(config, params)
+    pres = run(config)
+
+    print_reports(config, opts, pres)
     return 0        # success
 
 

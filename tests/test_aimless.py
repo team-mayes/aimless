@@ -21,7 +21,7 @@ import unittest
 from aimless.aimless import (calc_params, TOTAL_STEPS_KEY, BW_STEPS_KEY,
                              FW_STEPS_KEY, DT_STEPS_KEY, BW_OUT_KEY,
                              FW_OUT_KEY, DT_OUT_KEY, write_tpl_files,
-                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY, BASIN_FWD_KEY, BASIN_BACK_KEY, BRES, ACC_KEY, write_text_report, write_csv_report)
+                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY, BASIN_FWD_KEY, BASIN_BACK_KEY, BRES, ACC_KEY, write_text_report, write_csv_report, POSTDT_RST_NAME, GEN_FILES)
 from aimless.common import STATES
 
 # Test Constants #
@@ -267,10 +267,10 @@ class TestReverse(unittest.TestCase):
         shutil.rmtree(self.tgt_dir)
 
 
-tpres = {}
-tpres[1] = {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.B, ACC_KEY: True}
-tpres[2] = {BASIN_FWD_KEY: BRES.INC, BASIN_BACK_KEY: BRES.B}
-tpres[3] = {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.A}
+tpres = {1: {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.B, ACC_KEY: True},
+         2: {BASIN_FWD_KEY: BRES.INC, BASIN_BACK_KEY: BRES.B},
+         3: {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.A},
+         4: {BASIN_FWD_KEY: BRES.B, BASIN_BACK_KEY: BRES.B}}
 
 
 class TestReports(unittest.TestCase):
@@ -285,6 +285,131 @@ class TestReports(unittest.TestCase):
         write_csv_report(tpres, tgt, linesep='\n')
         with open(os.path.join(TEST_DATA_DIR, "test_report.csv")) as ref_rep:
             self.assertEqual(ref_rep.read(), tgt.getvalue())
+
+bparams = {RC1_LOW_A_KEY: 2.75, RC1_HIGH_A_KEY: 10.0, RC2_LOW_A_KEY: 0.0,
+           RC2_HIGH_A_KEY: 1.9, RC1_LOW_B_KEY: 0.0, RC1_HIGH_B_KEY: 2.0,
+           RC2_LOW_B_KEY: 3.0, RC2_HIGH_B_KEY: 10.0}
+
+class TestFindBasin(unittest.TestCase):
+    """
+    Verify results for AimlessShooter.find_basin_dir
+    """
+
+    def setUp(self):
+        self.tgt_dir = tempfile.mkdtemp()
+        self.out = StringIO.StringIO()
+        self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
+                                      TOPO_LOC, {}, bparams,
+                                      out=self.out, wait_secs=.001)
+
+    def test_a(self):
+        self.assertEqual(BRES.A, self.aimless.find_basin_dir(4.1, 0.7))
+
+    def test_b(self):
+        self.assertEqual(BRES.B, self.aimless.find_basin_dir(1.2, 9.2))
+
+    def test_i1(self):
+        self.assertEqual(BRES.INC, self.aimless.find_basin_dir(1.2, 1.0))
+
+    def test_i2(self):
+        self.assertEqual(BRES.INC, self.aimless.find_basin_dir(4.1, 8.6))
+
+class TestProcResults(unittest.TestCase):
+    """
+    Verify results for AimlessShooter.proc_results
+    """
+
+    def setUp(self):
+        self.tgt_dir = tempfile.mkdtemp()
+        self.out = StringIO.StringIO()
+        self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
+                                      TOPO_LOC, {}, bparams,
+                                      out=self.out, wait_secs=.001)
+        self.postdt = self._create_postdt()
+        self.shooter = self._create_shooter()
+
+    def test_reject(self):
+        result = {BASIN_FWD_KEY: BRES.INC, BASIN_BACK_KEY: BRES.B}
+        self.aimless.proc_results(result, self.shooter)
+        self.assertFalse(self._check_results())
+
+    def test_accept_ab(self):
+        result = {BASIN_FWD_KEY: BRES.A, BASIN_BACK_KEY: BRES.B}
+        self.aimless.proc_results(result, self.shooter)
+        self.assertTrue(self._check_results())
+
+    def test_accept_ba(self):
+        result = {BASIN_FWD_KEY: BRES.B, BASIN_BACK_KEY: BRES.A}
+        self.aimless.proc_results(result, self.shooter)
+        self.assertTrue(self._check_results())
+
+    def _create_shooter(self):
+        test_shooter = self.aimless.tgtres(SHOOTER_LOC_VAL)
+        with open(test_shooter, 'w') as tfile:
+            tfile.write("Test shooter file")
+        return test_shooter
+
+    def _create_postdt(self):
+        test_postdt = self.aimless.tgtres(POSTDT_RST_NAME)
+        with open(test_postdt, 'w') as tfile:
+            tfile.write("Test postdt file")
+        return test_postdt
+
+    def _check_results(self):
+        if not os.path.exists(self.aimless.x1_loc) and \
+                not os.path.exists(self.aimless.x2_loc):
+            return False
+
+        with open(self.shooter, 'r') as tfile:
+            if tfile.read() != "Test shooter file":
+                return False
+
+        with open(self.postdt, 'r') as tfile:
+            if tfile.read() != "Test postdt file":
+                return False
+
+        return True
+
+
+class TestClean(unittest.TestCase):
+    """
+    Verify results for AimlessShooter.clean
+    """
+
+    def setUp(self):
+        self.tgt_dir = tempfile.mkdtemp()
+        self.out = StringIO.StringIO()
+        self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
+                                      TOPO_LOC, {}, {},
+                                      out=self.out, wait_secs=.001)
+        self.path_id = 5
+
+    def test_clean(self):
+        path_out_dir = self.aimless.tgtres(OUT_DIR, str(self.path_id))
+        for create_me in GEN_FILES:
+            old_loc = self.aimless.tgtres(create_me)
+            with open(old_loc, 'w') as tfile:
+                tfile.write("Move me.")
+        self.aimless.clean(self.path_id)
+        for verify_me in GEN_FILES:
+            old_loc = self.aimless.tgtres(verify_me)
+            self.assertFalse(os.path.exists(old_loc))
+            new_loc = os.path.join(path_out_dir, verify_me)
+            self.assertTrue(os.path.exists(new_loc))
+            with open(new_loc, 'r') as tfile:
+                self.assertEqual("Move me.", tfile.read())
+
+
+## CLI ##
+# fetch_calc_params
+# write_tpls
+# run
+# get
+# read_config
+# parse_cmdline
+# print_reports
+
+
 
 # Default Runner #
 if __name__ == '__main__':

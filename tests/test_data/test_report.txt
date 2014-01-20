@@ -10,8 +10,12 @@
 	forward : A
 	backward: A
 	accepted: N
+04:
+	forward : B
+	backward: B
+	accepted: N
 
 Accepted:  1
-Rejected:  2
+Rejected:  3
 Both A  :  1
-Both B  :  0
+Both B  :  1
