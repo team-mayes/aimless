@@ -552,10 +552,11 @@ def fetch_calc_params(config):
     return params
 
 
-def write_tpls(config, params):
+def write_cfg_tpls(config, params):
     """
-    Fills the templates in the configuration's 'tpldir' and writes the results
-    to the configuration's 'tgtdir'.
+    ConfigParser adapter for write_tpl_files.  Fills the templates in the
+    configuration's 'tpldir' and writes the results to the configuration's
+    'tgtdir'.
 
     config -- A ConfigParser-style object with a 'main' section containing
               'tpldir' and 'tgtdir' values.
@@ -673,11 +674,11 @@ def print_reports(config, opts, pres):
     for fmt in opts.out_formats:
         if fmt.lower() == TEXT_FMT:
             txt_file = get(config, MAIN_SEC, TEXT_REPORT_KEY, DEF_TEXT_REPORT)
-            with open(txt_file) as txt_tgt:
+            with open(txt_file, 'w') as txt_tgt:
                 write_text_report(pres, txt_tgt)
         elif fmt.lower() == CSV_FMT:
             csv_file = get(config, MAIN_SEC, CSV_REPORT_KEY, DEF_CSV_REPORT)
-            with open(csv_file) as csv_tgt:
+            with open(csv_file, 'w') as csv_tgt:
                 write_csv_report(pres, csv_tgt)
         else:
             raise CfgError("Unhandled output format '%s'" % fmt)
@@ -694,7 +695,7 @@ def main(argv=None):
     opts, args = parse_cmdline(argv)
     config = read_config(opts.cfg_file)
     params = fetch_calc_params(config)
-    write_tpls(config, params)
+    write_cfg_tpls(config, params)
     pres = run(config)
 
     print_reports(config, opts, pres)

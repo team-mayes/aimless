@@ -7,6 +7,7 @@ test_aimless
 
 Tests for `aimless` module.
 """
+import ConfigParser
 import StringIO
 import difflib
 import filecmp
@@ -17,11 +18,12 @@ import tempfile
 from mock import MagicMock
 
 import unittest
+from aimless import aimless
 
 from aimless.aimless import (calc_params, TOTAL_STEPS_KEY, BW_STEPS_KEY,
                              FW_STEPS_KEY, DT_STEPS_KEY, BW_OUT_KEY,
                              FW_OUT_KEY, DT_OUT_KEY, write_tpl_files,
-                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY, BASIN_FWD_KEY, BASIN_BACK_KEY, BRES, ACC_KEY, write_text_report, write_csv_report, POSTDT_RST_NAME, GEN_FILES)
+                             TPL_LIST, AimlessShooter, init_dir, FWD_RST_NAME, OUT_DIR, BACK_RST_NAME, FWD_CONS_NAME, BACK_CONS_NAME, DT_CONS_NAME, RC1_LOW_A_KEY, RC1_HIGH_A_KEY, RC2_HIGH_A_KEY, RC2_LOW_A_KEY, RC1_LOW_B_KEY, RC1_HIGH_B_KEY, RC2_LOW_B_KEY, RC2_HIGH_B_KEY, BASIN_FWD_KEY, BASIN_BACK_KEY, BRES, ACC_KEY, write_text_report, write_csv_report, POSTDT_RST_NAME, GEN_FILES, fetch_calc_params, MAIN_SEC, NUM_PATHS_KEY, TGT_DIR_KEY, TPL_DIR_KEY, write_cfg_tpls, run, BASINS_SEC, JOBS_SEC, COORDS_KEY, XTWO_RST, XONE_RST, TOPO_KEY, DEF_OUT_FMTS, TEXT_REPORT_KEY, CSV_REPORT_KEY, CfgError)
 from aimless.common import STATES
 
 # Test Constants #
@@ -49,6 +51,7 @@ TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
 INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
 TPL_DIR = os.path.join(os.path.dirname(__file__), os.pardir, 'aimless', 'skel',
                        'tpl')
+TEST_CFG = os.path.join(os.path.dirname(__file__), "test_aimless.ini")
 TGT_DIR_VAL = "test/tgt/dir"
 SHOOTER_LOC_VAL = "test_shooter.rst"
 DIR_RST_LOC = "test_dir.rst"
@@ -116,7 +119,7 @@ class TestWriteTpls(unittest.TestCase):
         self.params = calc_params(TS_VAL)
 
     def test_tmp_tgt(self):
-        "Use a temp directory as the target."
+        """Use a temp directory as the target."""
         tgt_dir = tempfile.mkdtemp()
         self._del_tgts(tgt_dir)
         try:
@@ -125,6 +128,44 @@ class TestWriteTpls(unittest.TestCase):
         finally:
             self._del_tgts(tgt_dir)
             os.removedirs(tgt_dir)
+
+    def test_cfg(self):
+        """Test with write_cfg_tpls"""
+        tgt_dir = tempfile.mkdtemp()
+        cfg = ConfigParser.ConfigParser()
+        cfg.add_section(MAIN_SEC)
+        cfg.set(MAIN_SEC, TPL_DIR_KEY, TPL_DIR)
+        cfg.set(MAIN_SEC, TGT_DIR_KEY, tgt_dir)
+        try:
+            write_cfg_tpls(cfg, self.params)
+            self._check_tgts(tgt_dir)
+        finally:
+            self._del_tgts(tgt_dir)
+            os.removedirs(tgt_dir)
+
+    def test_cfg_no_tpl_dir(self):
+        cfg = ConfigParser.ConfigParser()
+        cfg.add_section(MAIN_SEC)
+        cfg.set(MAIN_SEC, TPL_DIR_KEY, "not_a_real_dir")
+        cfg.set(MAIN_SEC, TGT_DIR_KEY, "not_a_real_dir")
+        with self.assertRaises(Exception):
+            write_cfg_tpls(cfg, self.params)
+
+    def test_cfg_ne_tgt_dir(self):
+        """Tests with a non-existent tgt dir"""
+        tgt_dir = tempfile.mkdtemp()
+        tgt_sub_dir = os.path.join(tgt_dir, "random_subdir")
+        cfg = ConfigParser.ConfigParser()
+        cfg.add_section(MAIN_SEC)
+        cfg.set(MAIN_SEC, TPL_DIR_KEY, TPL_DIR)
+        cfg.set(MAIN_SEC, TGT_DIR_KEY, tgt_sub_dir)
+        try:
+            write_cfg_tpls(cfg, self.params)
+            self._check_tgts(tgt_sub_dir)
+        finally:
+            self._del_tgts(tgt_sub_dir)
+            os.removedirs(tgt_sub_dir)
+
 
     def _check_tgts(self, tgt_dir):
         "Compares the files in the target dir with reference files."
@@ -286,9 +327,11 @@ class TestReports(unittest.TestCase):
         with open(os.path.join(TEST_DATA_DIR, "test_report.csv")) as ref_rep:
             self.assertEqual(ref_rep.read(), tgt.getvalue())
 
+
 bparams = {RC1_LOW_A_KEY: 2.75, RC1_HIGH_A_KEY: 10.0, RC2_LOW_A_KEY: 0.0,
            RC2_HIGH_A_KEY: 1.9, RC1_LOW_B_KEY: 0.0, RC1_HIGH_B_KEY: 2.0,
            RC2_LOW_B_KEY: 3.0, RC2_HIGH_B_KEY: 10.0}
+
 
 class TestFindBasin(unittest.TestCase):
     """
@@ -313,6 +356,7 @@ class TestFindBasin(unittest.TestCase):
 
     def test_i2(self):
         self.assertEqual(BRES.INC, self.aimless.find_basin_dir(4.1, 8.6))
+
 
 class TestProcResults(unittest.TestCase):
     """
@@ -400,16 +444,138 @@ class TestClean(unittest.TestCase):
                 self.assertEqual("Move me.", tfile.read())
 
 
+param_cfg = ConfigParser.ConfigParser()
+param_cfg.add_section(MAIN_SEC)
+param_cfg.set(MAIN_SEC, TOTAL_STEPS_KEY, "1000")
+param_cfg.set(MAIN_SEC, NUM_PATHS_KEY, "10")
+
 ## CLI ##
-# fetch_calc_params
-# write_tpls
-# run
-# get
-# read_config
-# parse_cmdline
-# print_reports
+class TestCalcParams(unittest.TestCase):
+    """
+    Tests results for fetch_calc_params
+    """
+
+    def test_basic(self):
+        params = {NUM_PATHS_KEY: 10, TOTAL_STEPS_KEY: 1000, BW_STEPS_KEY: 500,
+                  FW_STEPS_KEY: 500, DT_STEPS_KEY: 10}
+        params[BW_OUT_KEY] = params[BW_STEPS_KEY] - 1
+        params[FW_OUT_KEY] = params[FW_STEPS_KEY] - 1
+        params[DT_OUT_KEY] = params[DT_STEPS_KEY] - 1
+
+        self.assertEqual(params, fetch_calc_params(param_cfg))
 
 
+class TestRun(unittest.TestCase):
+    """
+    Verify results for run.
+    """
+
+    def setUp(self):
+        self.tgt_dir = tempfile.mkdtemp()
+        self.aimless_inst = MagicMock()
+        self.aimless = MagicMock(return_value=self.aimless_inst)
+        self.cfg = ConfigParser.ConfigParser()
+        self.cfg.add_section(MAIN_SEC)
+        self.cfg.set(MAIN_SEC, TGT_DIR_KEY, self.tgt_dir)
+        self.cfg.set(MAIN_SEC, TPL_DIR_KEY, TPL_DIR_KEY)
+        self.cfg.set(MAIN_SEC, COORDS_KEY, COORDS_LOC)
+        self.cfg.set(MAIN_SEC, NUM_PATHS_KEY, "10")
+        self.cfg.set(MAIN_SEC, TOPO_KEY, TOPO_LOC)
+        self.cfg.add_section(BASINS_SEC)
+        self.cfg.set(BASINS_SEC, ACC_KEY, "19.1")
+        self.cfg.add_section(JOBS_SEC)
+        self.cfg.set(JOBS_SEC, BW_STEPS_KEY, "some_val")
+
+    def test_run(self):
+        run(self.cfg, tgt_class=self.aimless)
+        file_cmp(os.path.join(self.tgt_dir, XONE_RST), COORDS_LOC)
+        file_cmp(os.path.join(self.tgt_dir, XTWO_RST), COORDS_LOC)
+        self.assertEqual(((TPL_DIR_KEY, self.tgt_dir, TOPO_LOC, {BW_STEPS_KEY: "some_val"},
+                           {ACC_KEY: 19.1}),), self.aimless.call_args)
+        self.assertEqual(((10,),), self.aimless_inst.run_calcs.call_args)
+
+class TestGet(unittest.TestCase):
+    """
+    Verify results for get.
+    """
+
+    def setUp(self):
+        self.cfg = ConfigParser.ConfigParser()
+        self.cfg.add_section(MAIN_SEC)
+        self.cfg.set(MAIN_SEC, TGT_DIR_KEY, TPL_DIR)
+        self.def_val = "whatever"
+
+    def test_exists(self):
+        self.assertEqual(TPL_DIR, aimless.get(self.cfg, MAIN_SEC, TGT_DIR_KEY,
+                                              self.def_val))
+
+    def test_missing(self):
+        self.assertEqual(self.def_val, aimless.get(self.cfg, MAIN_SEC,
+                                                   "missing", self.def_val))
+
+class TestReadConfig(unittest.TestCase):
+    """
+    Verify results for read_config
+    """
+
+    def test_exists(self):
+        cfg = aimless.read_config(TEST_CFG)
+        self.assertEqual('input/cel6a_solv.prmtop', cfg.get(MAIN_SEC, TOPO_KEY))
+
+    def test_exists(self):
+        cfg = aimless.read_config("missing_file")
+        self.assertFalse(cfg.has_option(MAIN_SEC, TOPO_KEY))
+
+class TestParseCmdline(unittest.TestCase):
+    """
+    Verify results for parse_cmdline.
+    """
+    def test_zero(self):
+        opts, args = aimless.parse_cmdline([])
+        self.assertEqual(0, len(args))
+        self.assertEqual(DEF_OUT_FMTS, opts.out_formats)
+
+    def test_valid_fmts(self):
+        opts, args = aimless.parse_cmdline(["-o", "tc"])
+        self.assertEqual(0, len(args))
+        self.assertEqual("tc", opts.out_formats)
+
+    def test_invalid_fmts(self):
+        with self.assertRaises(SystemExit):
+            aimless.parse_cmdline(["-o", "yyz"])
+
+    def test_args(self):
+        with self.assertRaises(SystemExit):
+            aimless.parse_cmdline(["some_arg"])
+
+class TestPrintReports(unittest.TestCase):
+    """
+    Verify results for parse_cmdline.
+    """
+
+    def setUp(self):
+        self.tgt_dir = tempfile.mkdtemp()
+        self.cfg = ConfigParser.ConfigParser()
+        self.cfg.add_section(MAIN_SEC)
+        self.txt = os.path.join(self.tgt_dir, "test_report.txt")
+        self.csv = os.path.join(self.tgt_dir, "test_report.csv")
+        self.cfg.set(MAIN_SEC, CSV_REPORT_KEY, self.csv)
+        self.cfg.set(MAIN_SEC, TEXT_REPORT_KEY, self.txt)
+
+    def test_csv(self):
+        opts = MagicMock(out_formats="c")
+        aimless.print_reports(self.cfg, opts, tpres)
+        file_cmp(self.csv, os.path.join(TEST_DATA_DIR, "test_report.csv"))
+
+    def test_txt(self):
+        opts = MagicMock(out_formats="t")
+        aimless.print_reports(self.cfg, opts, tpres)
+        file_cmp(self.txt, os.path.join(TEST_DATA_DIR, "test_report.txt"))
+
+    def test_bad(self):
+        opts = MagicMock(out_formats="z")
+        with self.assertRaises(CfgError):
+            aimless.print_reports(self.cfg, opts, tpres)
 
 # Default Runner #
 if __name__ == '__main__':
