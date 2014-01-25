@@ -18,7 +18,7 @@ TSTATES = enum(COMPLETED='C', EXITING='E', HELD='H', QUEUED='Q', RUNNING='R',
 class TorqueSubmissionError(SubmissionError): pass
 class TorqueStatusError(StatusError): pass
 
-logger = logging.getLogger("torque")
+logger = logging.getLogger(__name__)
 
 def parse_id(raw_str):
     "Parses the numeric ID from a string of the form id.host"

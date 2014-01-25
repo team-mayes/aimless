@@ -13,6 +13,8 @@ import sys
 import optparse
 import common
 
+logger = logging.getLogger(__name__)
+
 DEF_SKEL_LOC = os.path.join(os.path.dirname(__file__), 'skel')
 
 # Logic #
@@ -27,7 +29,6 @@ def parse_cmdline(argv):
     """
     if argv is None:
         argv = sys.argv[1:]
-
     # initialize the parser object:
     parser = optparse.OptionParser(
         formatter=optparse.TitledHelpFormatter(width=78),

@@ -10,6 +10,7 @@ from ConfigParser import NoOptionError
 import csv
 import logging
 import os
+from os.path import expanduser
 import random
 import shutil
 from string import Template
@@ -17,26 +18,33 @@ import sys
 import time
 import datetime
 import math
-from common import enum
+from common import enum, cmakedir
 from torque import TorqueJob, TorqueSubmissionHandler, is_running
 import optparse
 
 # Log Setup #
-# logdir = os.environ.get("LOGDIR")
-# if logdir:
-#     logfile = os.path.join(logdir, "jslave.log")
-# else:
-#     logfile = expanduser('~/.jslave/jslave.log')
 
-# if not os.path.exists(logfile):
-#     cmakedir(os.path.dirname(logfile))
-#
-# logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#                     filename=logfile)
+lfmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+llvl = logging.DEBUG
+if os.environ.get("LOGTERM"):
+    hdlr = logging.StreamHandler()
+else:
+    logdir = os.environ.get("LOGDIR")
+    if logdir:
+        logfile = os.path.join(logdir, "jslave.log")
+    else:
+        logfile = expanduser('~/.jslave/jslave.log')
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger("aimless_main")
-logger.debug("Testing the logger")
+    if not os.path.exists(logfile):
+        cmakedir(os.path.dirname(logfile))
+    hdlr = logging.FileHandler(logfile)
+hdlr.setLevel(llvl)
+hdlr.setFormatter(lfmt)
+rlogger = logging.getLogger()
+rlogger.setLevel(llvl)
+rlogger.addHandler(hdlr)
+
+logger = logging.getLogger(__name__)
 
 # Constants #
 RES_DIR_FMT = "\t%-8s: %s%s"
@@ -125,8 +133,6 @@ OUTFILE_KEY = 'outfile'
 GEN_FILES = [BACK_OUT_NAME, FWD_OUT_NAME, DT_OUT_NAME, STARTER_OUT_NAME,
              BACK_MDCRD_NAME, FWD_MDCRD_NAME, DT_MDCRD_NAME, STARTER_MDCRD_NAME,
              BACK_CONS_NAME, FWD_CONS_NAME, DT_CONS_NAME]
-
-logger = logging.getLogger("aimless")
 
 # Exceptions #
 
@@ -218,11 +224,11 @@ def write_text_report(pres, tgt=sys.stdout):
 
         tgt.write("%02d:%s" % (path_id, os.linesep))
         for dir_key in (BASIN_FWD_KEY, BASIN_BACK_KEY):
-                tgt.write(RES_DIR_FMT % (dir_key,
-                                         res[dir_key], os.linesep))
+            tgt.write(RES_DIR_FMT % (dir_key,
+                                     res[dir_key], os.linesep))
         tgt.write(RES_DIR_FMT % (ACC_KEY,
-                             "Y" if ACC_KEY in res else "N",
-                             os.linesep))
+                                 "Y" if ACC_KEY in res else "N",
+                                 os.linesep))
     tgt.write(os.linesep)
     tgt.write(SUM_FMT % ("Accepted", acc_count, os.linesep))
     tgt.write(SUM_FMT % ("Rejected", len(pres) - acc_count, os.linesep))
@@ -242,7 +248,7 @@ def write_csv_report(pres, tgt=sys.stdout, linesep=os.linesep):
     csv_writer.writerow(["path", BASIN_FWD_KEY, BASIN_BACK_KEY, ACC_KEY])
     for path_id, res in pres.items():
         csv_writer.writerow([path_id, res[BASIN_FWD_KEY], res[BASIN_BACK_KEY],
-                            "Y" if ACC_KEY in res else "N"])
+                             "Y" if ACC_KEY in res else "N"])
 
 
 class AimlessShooter(object):
@@ -251,8 +257,7 @@ class AimlessShooter(object):
     """
 
     def __init__(self, tpl_dir, tgt_dir, topo_loc, job_params, basins_params,
-                 sub_handler=TorqueSubmissionHandler(), out=sys.stdout,
-                 wait_secs=DEF_WAIT_SECS):
+                 sub_handler=TorqueSubmissionHandler(), wait_secs=DEF_WAIT_SECS):
         """Sets up the initial state for this instance.
 
         Positional Arguments:
@@ -275,10 +280,11 @@ class AimlessShooter(object):
         self.job_params = job_params
         self.bp = basins_params
         self.sub_handler = sub_handler
-        self.out = out
         self.wait_secs = wait_secs
         self.x1_loc = self.tgtres(XONE_RST)
         self.x2_loc = self.tgtres(XTWO_RST)
+        self.logger = logging.getLogger(
+            '.'.join((__name__, self.__class__.__name__)))
 
     def run_calcs(self, num_paths):
         """Top-level runner for performing the aimless shooting calculations
@@ -296,7 +302,7 @@ class AimlessShooter(object):
                 shooter = self.x1_loc
             else:
                 shooter = self.x2_loc
-            self.out.write("Using '%s'\n" % shooter)
+            self.logger.debug("Using '%s'\n" % shooter)
             self.run_starter(pnum, shooter)
             self.rev_vel()
             self.run_dt()
@@ -313,7 +319,7 @@ class AimlessShooter(object):
         pnum -- The path number currently running.
         shooter -- The chosen shooter file for this path.
         """
-        self.out.write('running starter... generating velocities\n')
+        self.logger.debug('running starter... generating velocities\n')
         start_id = self._sub_job(shooter,
                                  self.tgtres(FWD_IN_NAME),
                                  self.tgtres(STARTER_IN_NAME),
@@ -329,7 +335,7 @@ class AimlessShooter(object):
     def rev_vel(self):
         """Generates the backward.rst file based on the contents of forward.rst.
         """
-        self.out.write('reversing velocities\n')
+        self.logger.debug('reversing velocities\n')
         fwd_loc = self.tgtres(FWD_RST_NAME)
         back_loc = self.tgtres(BACK_RST_NAME)
         with open(fwd_loc) as fwd_file:
@@ -382,7 +388,7 @@ class AimlessShooter(object):
     def run_dt(self):
         """Submits the DT job. Returns when the submitted job is finished.
         """
-        self.out.write('running dt\n')
+        self.logger.debug('running dt\n')
         start_id = self._sub_job(self.tgtres(FWD_RST_NAME),
                                  self.tgtres(POSTDT_RST_NAME),
                                  self.tgtres(DT_IN_NAME),
@@ -394,14 +400,14 @@ class AimlessShooter(object):
         """Submits the forward and backward jobs concurrently. Returns when
         the submitted jobs are finished.
         """
-        self.out.write('running forward\n')
+        self.logger.debug('running forward\n')
         fwd_id = self._sub_job(self.tgtres(POSTDT_RST_NAME),
                                self.tgtres(POSTFWD_RST_NAME),
                                self.tgtres(FWD_IN_NAME),
                                self.tgtres(FWD_OUT_NAME),
                                self.tgtres(FWD_MDCRD_NAME))
 
-        self.out.write('running backward\n')
+        self.logger.debug('running backward\n')
         back_id = self._sub_job(self.tgtres(POSTFWD_RST_NAME),
                                 self.tgtres(POSTBACK_RST_NAME),
                                 self.tgtres(BACK_IN_NAME),
@@ -418,13 +424,13 @@ class AimlessShooter(object):
         jstats = self.sub_handler.stat_jobs(job_ids)
         wait_count = 1
         while is_running(job_ids, jstats):
-            self.out.write("Waiting '%d' seconds for job IDs '%s'\n" %
-                           (wait_count * self.wait_secs, ",".join(map(str, job_ids))))
+            self.logger.debug("Waiting '%d' seconds for job IDs '%s'\n" %
+                              (wait_count * self.wait_secs, ",".join(map(str, job_ids))))
             time.sleep(self.wait_secs)
             wait_count += 1
             jstats = self.sub_handler.stat_jobs(job_ids)
-        self.out.write("Finished job IDs '%s' in '%d' seconds\n" %
-                       (",".join(map(str, job_ids)), (wait_count - 1) * self.wait_secs))
+        self.logger.debug("Finished job IDs '%s' in '%d' seconds\n" %
+                          (",".join(map(str, job_ids)), (wait_count - 1) * self.wait_secs))
 
     def _sub_job(self, shooter_loc, dir_rst_loc, in_loc, out_loc, mdcrd_loc):
         """Fills the job template with the given parameters and submits the
@@ -589,7 +595,7 @@ def run(config, tgt_class=AimlessShooter):
         bparams[bkey] = float(bval)
     topo_file = config.get(MAIN_SEC, TOPO_KEY)
     aims = tgt_class(tpl_dir, tgt_dir, topo_file,
-                          dict(config.items(JOBS_SEC)), bparams)
+                     dict(config.items(JOBS_SEC)), bparams)
     return aims.run_calcs(num_paths)
 
 # Command-line processing and control #

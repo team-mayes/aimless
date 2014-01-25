@@ -192,12 +192,11 @@ class TestAimlessShooter(unittest.TestCase):
 
     def setUp(self):
         self.tgt_dir = tempfile.mkdtemp()
-        self.out = StringIO.StringIO()
         self.handler = MagicMock()
         self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
                                       TOPO_LOC, dict(), BASIN_VALS,
                                       sub_handler=self.handler,
-                                      out=self.out, wait_secs=.001)
+                                      wait_secs=.001)
         self.fwd_name = os.path.join(self.tgt_dir, FWD_RST_NAME)
 
     def test_sub(self):
@@ -277,12 +276,11 @@ class TestReverse(unittest.TestCase):
 
     def setUp(self):
         self.tgt_dir = tempfile.mkdtemp()
-        self.out = StringIO.StringIO()
         self.handler = MagicMock()
         self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
                                       TOPO_LOC, {}, {},
                                       sub_handler=self.handler,
-                                      out=self.out, wait_secs=.001)
+                                      wait_secs=.001)
         self.fwd_name = os.path.join(self.tgt_dir, FWD_RST_NAME)
         self.back_name = os.path.join(self.tgt_dir, BACK_RST_NAME)
 
@@ -340,10 +338,12 @@ class TestFindBasin(unittest.TestCase):
 
     def setUp(self):
         self.tgt_dir = tempfile.mkdtemp()
-        self.out = StringIO.StringIO()
         self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
                                       TOPO_LOC, {}, bparams,
-                                      out=self.out, wait_secs=.001)
+                                      wait_secs=.001)
+
+    def tearDown(self):
+        shutil.rmtree(self.tgt_dir)
 
     def test_a(self):
         self.assertEqual(BRES.A, self.aimless.find_basin_dir(4.1, 0.7))
@@ -365,12 +365,14 @@ class TestProcResults(unittest.TestCase):
 
     def setUp(self):
         self.tgt_dir = tempfile.mkdtemp()
-        self.out = StringIO.StringIO()
         self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
                                       TOPO_LOC, {}, bparams,
-                                      out=self.out, wait_secs=.001)
+                                      wait_secs=.001)
         self.postdt = self._create_postdt()
         self.shooter = self._create_shooter()
+
+    def tearDown(self):
+        shutil.rmtree(self.tgt_dir)
 
     def test_reject(self):
         result = {BASIN_FWD_KEY: BRES.INC, BASIN_BACK_KEY: BRES.B}
@@ -422,11 +424,13 @@ class TestClean(unittest.TestCase):
 
     def setUp(self):
         self.tgt_dir = tempfile.mkdtemp()
-        self.out = StringIO.StringIO()
         self.aimless = AimlessShooter(TPL_DIR, self.tgt_dir,
                                       TOPO_LOC, {}, {},
-                                      out=self.out, wait_secs=.001)
+                                      wait_secs=.001)
         self.path_id = 5
+
+    def tearDown(self):
+        shutil.rmtree(self.tgt_dir)
 
     def test_clean(self):
         path_out_dir = self.aimless.tgtres(OUT_DIR, str(self.path_id))
@@ -493,6 +497,9 @@ class TestRun(unittest.TestCase):
         self.assertEqual(((TPL_DIR_KEY, self.tgt_dir, TOPO_LOC, {BW_STEPS_KEY: "some_val"},
                            {ACC_KEY: 19.1}),), self.aimless.call_args)
         self.assertEqual(((10,),), self.aimless_inst.run_calcs.call_args)
+
+    def tearDown(self):
+        shutil.rmtree(self.tgt_dir)
 
 class TestGet(unittest.TestCase):
     """
@@ -561,6 +568,9 @@ class TestPrintReports(unittest.TestCase):
         self.csv = os.path.join(self.tgt_dir, "test_report.csv")
         self.cfg.set(MAIN_SEC, CSV_REPORT_KEY, self.csv)
         self.cfg.set(MAIN_SEC, TEXT_REPORT_KEY, self.txt)
+
+    def tearDown(self):
+        shutil.rmtree(self.tgt_dir)
 
     def test_csv(self):
         opts = MagicMock(out_formats="c")
