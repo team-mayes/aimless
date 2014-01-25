@@ -4,11 +4,9 @@
 echo Working directory is $PBS_O_WORKDIR
 cd $PBS_O_WORKDIR
 
-cp $PBS_NODEFILE 1nodefile
-
 mpdboot -f $PBS_NODEFILE -n 1
 
-mpiexec -machinefile 1nodefile -n $numcpus $AMBERHOME/bin/sander.MPI -O
+mpiexec -machinefile $PBS_NODEFILE -n $numcpus $AMBERHOME/bin/sander.MPI -O
 -i test_in -o test_out -p test_topo.file -c test_shooter.rst -r test_dir.rst -ref test_shooter.rst -x test_mdcrd
 mpdallexit
 

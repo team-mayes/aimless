@@ -14,7 +14,7 @@ class PersistenceError(JobSlaveError): pass
 class NotFoundError(JobSlaveError): pass
 class InvalidDataError(JobSlaveError): pass
 
-logger = logging.getLogger("jslave_common")
+logger = logging.getLogger(__name__)
 
 
 class NonStringIterable:
