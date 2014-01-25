@@ -433,7 +433,7 @@ class TestClean(unittest.TestCase):
         shutil.rmtree(self.tgt_dir)
 
     def test_clean(self):
-        path_out_dir = self.aimless.tgtres(OUT_DIR, str(self.path_id))
+        path_out_dir = self.aimless.tgtres(OUT_DIR, "%02d" % self.path_id)
         for create_me in GEN_FILES:
             old_loc = self.aimless.tgtres(create_me)
             with open(old_loc, 'w') as tfile:
@@ -573,19 +573,16 @@ class TestPrintReports(unittest.TestCase):
         shutil.rmtree(self.tgt_dir)
 
     def test_csv(self):
-        opts = MagicMock(out_formats="c")
-        aimless.print_reports(self.cfg, opts, tpres)
+        aimless.print_reports(self.cfg, "c", tpres)
         file_cmp(self.csv, os.path.join(TEST_DATA_DIR, "test_report.csv"))
 
     def test_txt(self):
-        opts = MagicMock(out_formats="t")
-        aimless.print_reports(self.cfg, opts, tpres)
+        aimless.print_reports(self.cfg, "t", tpres)
         file_cmp(self.txt, os.path.join(TEST_DATA_DIR, "test_report.txt"))
 
     def test_bad(self):
-        opts = MagicMock(out_formats="z")
         with self.assertRaises(CfgError):
-            aimless.print_reports(self.cfg, opts, tpres)
+            aimless.print_reports(self.cfg, "z", tpres)
 
 # Default Runner #
 if __name__ == '__main__':

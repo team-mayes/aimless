@@ -2,7 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-Creates and runs AMBER processes for aimless shooting.
+Initializes a location for running aimless shooting.  The contents
+of the "skel" subdirectory is copied into the target directory.
+This currently includes aimless.ini, an AimlessShooter configuration
+file, an input directory, and a tpl directory.  The AimlessShooter
+script expects aimless.ini to be in the current working directory.
+The skell aimless.ini assumes the input directory contains the
+topology and coordinates file while the tpl directory contains
+all of the templates used by the script.
 """
 
 import ConfigParser
@@ -20,6 +27,7 @@ DEF_SKEL_LOC = os.path.join(os.path.dirname(__file__), 'skel')
 # Logic #
 
 def copy_skel(src, dest):
+    """Copies the contents of src to dest."""
     common.copytree(src, dest)
 
 def parse_cmdline(argv):

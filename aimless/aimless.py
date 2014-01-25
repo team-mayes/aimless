@@ -3,12 +3,20 @@
 
 """
 Creates and runs AMBER processes for aimless shooting.
+
+Logs go to ~/.jslave/jslave.log by default.  You may set the LOGDIR environment
+variable to specify another log directory location.  Setting the LOGTERM
+environment variable to any value will send all log messages to standard error.
+
+Log levels are DEBUG by default.  Change the llvl value to another value if
+you would prefer a different minimum log level.
 """
 
 import ConfigParser
 from ConfigParser import NoOptionError
 import csv
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from os.path import expanduser
 import random
@@ -22,8 +30,8 @@ from common import enum, cmakedir
 from torque import TorqueJob, TorqueSubmissionHandler, is_running
 import optparse
 
+TEN_MB = 10485760
 # Log Setup #
-
 lfmt = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 llvl = logging.DEBUG
 if os.environ.get("LOGTERM"):
@@ -37,7 +45,7 @@ else:
 
     if not os.path.exists(logfile):
         cmakedir(os.path.dirname(logfile))
-    hdlr = logging.FileHandler(logfile)
+    hdlr = RotatingFileHandler(logfile, maxBytes=TEN_MB, backupCount=5)
 hdlr.setLevel(llvl)
 hdlr.setFormatter(lfmt)
 rlogger = logging.getLogger()
@@ -253,7 +261,8 @@ def write_csv_report(pres, tgt=sys.stdout, linesep=os.linesep):
 
 class AimlessShooter(object):
     """Encapsulates the process of running and analyzing compute jobs related
-    to the Aimless Shooting modeling technique.
+    to the Aimless Shooting modeling technique.  Instances are generally
+    run using the run_calcs method.
     """
 
     def __init__(self, tpl_dir, tgt_dir, topo_loc, job_params, basins_params,
@@ -479,10 +488,10 @@ class AimlessShooter(object):
         a, b, or i depending on which basin (if any) matches.
         """
         if self.bp[RC1_LOW_A_KEY] < rc1 < self.bp[RC1_HIGH_A_KEY] \
-            and self.bp[RC2_LOW_A_KEY] < rc2 < self.bp[RC2_HIGH_A_KEY]:
+                and self.bp[RC2_LOW_A_KEY] < rc2 < self.bp[RC2_HIGH_A_KEY]:
             return BRES.A
         elif self.bp[RC1_LOW_B_KEY] < rc1 < self.bp[RC1_HIGH_B_KEY] \
-            and self.bp[RC2_LOW_B_KEY] < rc2 < self.bp[RC2_HIGH_B_KEY]:
+                and self.bp[RC2_LOW_B_KEY] < rc2 < self.bp[RC2_HIGH_B_KEY]:
             return BRES.B
         else:
             return BRES.INC
@@ -504,7 +513,12 @@ class AimlessShooter(object):
             result[ACC_KEY] = True
 
     def clean(self, pnum):
-        path_out_dir = self.tgtres(OUT_DIR, str(pnum))
+        """Moves artifacts from a path's calculation to an output directory
+        named for the given path number.
+
+        pnum -- The path number of the finished calculation.
+        """
+        path_out_dir = self.tgtres(OUT_DIR, "%02d" % pnum)
         if not os.path.exists(path_out_dir):
             os.makedirs(path_out_dir)
         for mvname in GEN_FILES:
@@ -515,15 +529,17 @@ class AimlessShooter(object):
                 logger.warn("Could not archive '%s': %s" % (path_out_dir, e))
 
 ### CLI ###
-
 DEF_CFG_NAME = 'aimless.ini'
+
+# Keys #
 TPL_DIR_KEY = 'tpldir'
 TGT_DIR_KEY = 'tgtdir'
 TEXT_REPORT_KEY = 'text_report'
 CSV_REPORT_KEY = 'csv_report'
+
+# Reports #
 DEF_TEXT_REPORT = 'aimless_results.txt'
 DEF_CSV_REPORT = 'aimless_results.csv'
-
 TEXT_FMT = 't'
 CSV_FMT = 'c'
 VALID_FMTS = [TEXT_FMT, CSV_FMT]
@@ -600,10 +616,16 @@ def run(config, tgt_class=AimlessShooter):
 
 # Command-line processing and control #
 
+
 def get(cfg, opt_name, sec_name, def_val):
     """
     Returns the cfg val for the given section and option, returning
     the default value if no option is defined.
+
+    cfg      -- The configuration instance to query.
+    opt_name -- The option key.
+    sec_name -- The section name.
+    def_val  -- The value to use if none are found in the cfg.
     """
     try:
         return cfg.get(opt_name, sec_name)
@@ -671,13 +693,17 @@ def parse_cmdline(argv):
     return opts, args
 
 
-def print_reports(config, opts, pres):
+def print_reports(config, fmts, pres):
     """
     Produces reports from the given results.
+
+    config -- The configuration instance to query.
+    fmts   -- A string where each character represents a report format.
+    pres   -- The report results from AimlessShooter.
     """
     # TODO: Consider rotation
     # http://johnebailey.blogspot.com/2012/01/rolling-files-and-directories-with.html
-    for fmt in opts.out_formats:
+    for fmt in fmts:
         if fmt.lower() == TEXT_FMT:
             txt_file = get(config, MAIN_SEC, TEXT_REPORT_KEY, DEF_TEXT_REPORT)
             with open(txt_file, 'w') as txt_tgt:
@@ -704,7 +730,7 @@ def main(argv=None):
     write_cfg_tpls(config, params)
     pres = run(config)
 
-    print_reports(config, opts, pres)
+    print_reports(config, opts.out_formats, pres)
     return 0        # success
 
 
