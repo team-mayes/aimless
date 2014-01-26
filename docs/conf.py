@@ -52,7 +52,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Aimless Shooting with AMBER'
+project = u'Aimless Shooting with Amber'
 copyright = u'2013, Chris Mayes'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -106,7 +106,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+html_theme = 'agogo'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -135,7 +135,7 @@ html_theme = 'default'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+#html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -198,7 +198,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'aimless.tex', u'Aimless Shooting with AMBER Documentation',
+  ('index', 'aimless.tex', u'Aimless Shooting with Amber Documentation',
    u'Chris Mayes', 'manual'),
 ]
 
@@ -228,7 +228,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'aimless', u'Aimless Shooting with AMBER Documentation',
+    ('index', 'aimless', u'Aimless Shooting with Amber Documentation',
      [u'Chris Mayes'], 1)
 ]
 
@@ -242,7 +242,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'aimless', u'Aimless Shooting with AMBER Documentation',
+  ('index', 'aimless', u'Aimless Shooting with Amber Documentation',
    u'Chris Mayes', 'aimless', 'One line description of project.',
    'Miscellaneous'),
 ]

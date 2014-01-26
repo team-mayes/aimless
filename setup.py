@@ -3,6 +3,7 @@
 
 import os
 import sys
+import aimless
 
 
 try:
@@ -19,8 +20,8 @@ history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 
 setup(
     name='aimless',
-    version='0.4.0',
-    description='A run script for submitting and processing aimless shooting simulations using AMBER.',
+    version=aimless.__version__,
+    description='A run script for submitting and processing aimless shooting simulations using Amber.',
     long_description=readme + '\n\n' + history,
     author='Chris Mayes',
     author_email='cmayes@cmayes.com',
